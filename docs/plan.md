@@ -63,8 +63,8 @@ Ràng buộc còn lại của FR-2.2 (vòng lặp, tối đa 2 parent, cảnh b�
 
 | # | Việc | FR | Ước lượng |
 |---|---|---|---|
-| M0 | Scaffold Vite + Supabase project, schema, RLS, Google login | 6.1, 6.2 | 1d |
-| M1 | CRUD người + upload ảnh + tự lưu + undo xóa | 1.1–1.4, 6.3 | 2d |
+| M0 ✅ | Scaffold Vite + Supabase project, schema, RLS, Google login | 6.1, 6.2 | 1d |
+| M1 ✅ | CRUD người + upload ảnh + tự lưu + undo xóa | 1.1–1.4, 6.3 | 2d |
 | M2 | Render cây: `relatives-tree` + node component + pan/zoom + fit/reset | 3.1, 3.2 | 3d |
 | M3 | Thêm/xóa quan hệ từ node + trigger ràng buộc + nét đứt cho ly hôn | 2.1–2.4 | 2d |
 | M4 | Panel chi tiết, thu gọn nhánh, re-root, tìm theo tên | 3.3–3.5, 4.1 | 2d |

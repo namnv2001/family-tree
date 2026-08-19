@@ -2,7 +2,7 @@
 
 Ứng dụng web hiển thị cây gia phả đơn giản. Một người biên tập nhập dữ liệu thành viên, xem ra sơ đồ cây, chia sẻ link chỉ-xem cho họ hàng.
 
-**Trạng thái:** M0 xong — scaffold, schema + RLS, đăng nhập Google. Chưa có CRUD người (M1).
+**Trạng thái:** M0 + M1 xong — đăng nhập Google, CRUD thành viên (thêm/sửa/xóa + undo 10s), ảnh đại diện (crop vuông, Storage), tự lưu. Chưa hiển thị cây (M2) và chưa có quan hệ cha–mẹ–con/vợ–chồng (M3) — người mới thêm chỉ đứng độc lập.
 
 Vite + React + TS + Tailwind, backend là Supabase (Postgres + Auth + Storage + RLS).
 
@@ -21,9 +21,9 @@ Vite + React + TS + Tailwind, backend là Supabase (Postgres + Auth + Storage + 
 
 ### 2. Chạy migration
 
-**SQL Editor → New query** → dán toàn bộ [supabase/migrations/0001_init.sql](supabase/migrations/0001_init.sql) → **Run**.
+**SQL Editor → New query** → dán toàn bộ [supabase/migrations/0001_init.sql](supabase/migrations/0001_init.sql) → **Run**. Lặp lại với [0002_photos_storage.sql](supabase/migrations/0002_photos_storage.sql) (tạo bucket `photos` cho ảnh đại diện, FR-1.3) — **phải chạy sau** 0001, theo đúng thứ tự số.
 
-Kiểm: **Table Editor** thấy 3 bảng `trees`, `people`, `relationships`, cả 3 đều báo *RLS enabled*.
+Kiểm: **Table Editor** thấy 3 bảng `trees`, `people`, `relationships`, cả 3 đều báo *RLS enabled*. **Storage** thấy bucket `photos`, đánh dấu *Private*.
 
 ### 3. Lấy callback URL của Supabase
 

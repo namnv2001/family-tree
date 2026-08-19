@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase, type Tree } from './lib/supabase'
+import { PeoplePage } from './components/PeoplePage'
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -86,8 +87,8 @@ function Home({ session }: { session: Session }) {
           </button>
         </div>
       </header>
-      <main className="grid flex-1 place-items-center text-stone-400">
-        Chưa có thành viên nào. (M1 sẽ thêm CRUD người.)
+      <main className="flex flex-1 flex-col overflow-hidden">
+        <PeoplePage treeId={tree.id} />
       </main>
     </div>
   )
