@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { TransformComponent, TransformWrapper, type ReactZoomPanPinchContentRef } from 'react-zoom-pan-pinch'
+import {
+  TransformComponent,
+  TransformWrapper,
+  type ReactZoomPanPinchContentRef,
+} from 'react-zoom-pan-pinch'
 import { listPeople, type Person } from '../lib/people'
 import { listRelationships, type Relationship } from '../lib/relationships'
 import { buildTreeLayout } from '../lib/treeLayout'
@@ -12,7 +16,9 @@ const UNIT_Y = NODE_HEIGHT / 2
 
 export function TreeView({ treeId }: { treeId: string }) {
   const [people, setPeople] = useState<Person[] | null>(null)
-  const [relationships, setRelationships] = useState<Relationship[] | null>(null)
+  const [relationships, setRelationships] = useState<Relationship[] | null>(
+    null,
+  )
   const [error, setError] = useState<string | null>(null)
   const transformRef = useRef<ReactZoomPanPinchContentRef>(null)
 
@@ -22,7 +28,9 @@ export function TreeView({ treeId }: { treeId: string }) {
         setPeople(p)
         setRelationships(r)
       })
-      .catch((err) => setError(err instanceof Error ? err.message : 'Không tải được cây.'))
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : 'Không tải được cây.'),
+      )
   }, [treeId])
 
   // FR-3.1: tính toán layout (relatives-tree) chỉ khi dữ liệu đổi, không phải
@@ -45,7 +53,11 @@ export function TreeView({ treeId }: { treeId: string }) {
     if (!ref || !wrapper || !content) return
     // "Fit toàn cây" (FR-3.2): scale nhỏ nhất giữa 2 chiều để toàn bộ nội dung
     // vừa khung nhìn, không zoom to hơn 100% với cây chỉ có vài người.
-    const scale = Math.min(wrapper.clientWidth / content.offsetWidth, wrapper.clientHeight / content.offsetHeight, 1)
+    const scale = Math.min(
+      wrapper.clientWidth / content.offsetWidth,
+      wrapper.clientHeight / content.offsetHeight,
+      1,
+    )
     ref.centerView(scale, 200)
   }
 
@@ -72,14 +84,27 @@ export function TreeView({ treeId }: { treeId: string }) {
       </div>
 
       {layout.nodes.length === 0 ? (
-        <p className="p-4 text-center text-stone-400">Chưa có ai trong cây. Thêm người ở tab Danh sách.</p>
+        <p className="p-4 text-center text-stone-400">
+          Chưa có ai trong cây. Thêm người ở tab Danh sách.
+        </p>
       ) : (
         <div className="flex-1 overflow-hidden bg-stone-100">
-          <TransformWrapper ref={transformRef} minScale={0.15} maxScale={2} limitToBounds={false} centerOnInit>
-            <TransformComponent wrapperStyle={{ width: '100%', height: '100%' }}>
+          <TransformWrapper
+            ref={transformRef}
+            minScale={0.15}
+            maxScale={2}
+            limitToBounds={false}
+            centerOnInit
+          >
+            <TransformComponent
+              wrapperStyle={{ width: '100%', height: '100%' }}
+            >
               <div
                 className="relative"
-                style={{ width: layout.canvas.width * UNIT_X, height: layout.canvas.height * UNIT_Y }}
+                style={{
+                  width: layout.canvas.width * UNIT_X,
+                  height: layout.canvas.height * UNIT_Y,
+                }}
               >
                 {/* Nét nối vẽ trước, dưới node — phần đi qua khoảng hở giữa các
                     node thì lộ ra, phần đi qua thân node thì bị node che, đúng
@@ -104,17 +129,14 @@ export function TreeView({ treeId }: { treeId: string }) {
                 {layout.nodes.map((n) => (
                   <div
                     key={n.id}
-                    // items/justify-center: thẻ bên trong co theo nội dung
-                    // (fit-content) — canh giữa trong ô lưới để tâm thẻ vẫn
-                    // khớp điểm nối mà relatives-tree tính (giữa ô), không bị
-                    // lệch trái khi thẻ hẹp hơn ô.
                     className="absolute flex items-center justify-center"
                     style={{
                       left: n.left * UNIT_X,
                       top: n.top * UNIT_Y,
-                      width: NODE_WIDTH,
+                      minWidth: NODE_WIDTH,
                       height: NODE_HEIGHT,
                       padding: CARD_INSET,
+                      width: 'fit-content',
                     }}
                   >
                     <TreeNode person={n} />
