@@ -65,7 +65,7 @@ Ràng buộc còn lại của FR-2.2 (vòng lặp, tối đa 2 parent, cảnh b�
 |---|---|---|---|
 | M0 ✅ | Scaffold Vite + Supabase project, schema, RLS, Google login | 6.1, 6.2 | 1d |
 | M1 ✅ | CRUD người + upload ảnh + tự lưu + undo xóa | 1.1–1.4, 6.3 | 2d |
-| M2 | Render cây: `relatives-tree` + node component + pan/zoom + fit/reset | 3.1, 3.2 | 3d |
+| M2 🔶 | Render cây: `relatives-tree` + node component + pan/zoom + fit/reset — spike xong (xem mục 5), còn lại UI | 3.1, 3.2 | 3d |
 | M3 | Thêm/xóa quan hệ từ node + trigger ràng buộc + nét đứt cho ly hôn | 2.1–2.4 | 2d |
 | M4 | Panel chi tiết, thu gọn nhánh, re-root, tìm theo tên | 3.3–3.5, 4.1 | 2d |
 | M5 | Link chia sẻ chỉ-xem + xuất PNG | 5.1, 5.2 | 1d |
@@ -81,7 +81,7 @@ Làm M1 (nhập liệu) trước M2 (hiển thị): cần dữ liệu thật, x�
 
 | Rủi ro | Xử lý |
 |---|---|
-| **`relatives-tree` không đủ cho ca nhiều vợ / con theo từng cặp** | Spike **0.5 ngày ở đầu M2**: dựng đúng ca "1 người 3 vợ, mỗi cặp 2–3 con" trước khi viết UI. Fail → phương án B: `family-chart`. Fail nữa → tự viết layout, +4 ngày, phải báo lại. |
+| **`relatives-tree` không đủ cho ca nhiều vợ / con theo từng cặp** | ✅ **Đã spike (2026-08-20)** — `scripts/spike-relatives-tree.mjs` dựng ca "1 người 3 vợ (1 đang hôn, 2 ly hôn), 8 con chia 3+3+2" và gọi `calcTree` thật của lib. Kết quả PASS cả 10 assertion: không đè node, 3 vợ cùng hàng với P, 3 nhóm con nằm liền nhau và tách biệt nhau (đúng AC "mỗi cặp là một nhóm gia đình riêng"). Mẫu chính thức `several-spouses-n2.json` của lib cũng test đúng ca này (3 vợ, con chia theo mẹ) — không phải chỉ ăn may với input của mình. **Quyết định: Go với `relatives-tree`**, không cần phương án B. Cách chạy lại spike ghi trong header file script (bundle bằng `rolldown` có sẵn qua Vite 8, vì lib build ESM thiếu đuôi file, Node không tự resolve được). |
 | Cây 500 người render chậm | Node là DOM thuần trước. Chậm → cull node ngoài viewport. Chưa đo thì chưa tối ưu. |
 | Người dùng nhập 5 người rồi bỏ | Đây là rủi ro sản phẩm lớn nhất, không phải rủi ro kỹ thuật. Đo FR chỉ số #1 từ tuần đầu. |
 | Tên gọi họ hàng tiếng Việt (FR-4.2) | Đã đẩy sang v2 đúng chỗ. Đừng để nó bò vào MVP. |
