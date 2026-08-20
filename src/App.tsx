@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase, type Tree } from './lib/supabase'
 import { PeoplePage } from './components/PeoplePage'
+import { TreeView } from './components/TreeView'
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -52,6 +53,7 @@ function SignIn() {
 function Home({ session }: { session: Session }) {
   const [tree, setTree] = useState<Tree | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [tab, setTab] = useState<'tree' | 'list'>('tree')
 
   // FR-6.2: một cây / một tài khoản, do trigger handle_new_user tạo lúc đăng ký.
   // Không tạo ở client — để chỗ tạo cây chỉ có một.
@@ -76,7 +78,17 @@ function Home({ session }: { session: Session }) {
   return (
     <div className="flex h-full flex-col">
       <header className="flex items-center justify-between border-b border-stone-200 px-4 py-3">
-        <h1 className="font-semibold text-stone-800">{tree.name}</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="font-semibold text-stone-800">{tree.name}</h1>
+          <nav className="flex gap-1 text-sm">
+            <TabButton active={tab === 'tree'} onClick={() => setTab('tree')}>
+              Cây
+            </TabButton>
+            <TabButton active={tab === 'list'} onClick={() => setTab('list')}>
+              Danh sách
+            </TabButton>
+          </nav>
+        </div>
         <div className="flex items-center gap-3 text-sm text-stone-500">
           <span>{session.user.email}</span>
           <button
@@ -88,9 +100,28 @@ function Home({ session }: { session: Session }) {
         </div>
       </header>
       <main className="flex flex-1 flex-col overflow-hidden">
-        <PeoplePage treeId={tree.id} />
+        {tab === 'tree' ? <TreeView treeId={tree.id} /> : <PeoplePage treeId={tree.id} />}
       </main>
     </div>
+  )
+}
+
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-md px-3 py-1.5 ${active ? 'bg-stone-800 text-white' : 'text-stone-600 hover:bg-stone-100'}`}
+    >
+      {children}
+    </button>
   )
 }
 

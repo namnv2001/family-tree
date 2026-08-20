@@ -65,13 +65,15 @@ Ràng buộc còn lại của FR-2.2 (vòng lặp, tối đa 2 parent, cảnh b�
 |---|---|---|---|
 | M0 ✅ | Scaffold Vite + Supabase project, schema, RLS, Google login | 6.1, 6.2 | 1d |
 | M1 ✅ | CRUD người + upload ảnh + tự lưu + undo xóa | 1.1–1.4, 6.3 | 2d |
-| M2 🔶 | Render cây: `relatives-tree` + node component + pan/zoom + fit/reset — spike xong (xem mục 5), còn lại UI | 3.1, 3.2 | 3d |
+| M2 🔶 | Render cây: `relatives-tree` + node component + pan/zoom + fit/reset | 3.1, 3.2 | 3d |
 | M3 | Thêm/xóa quan hệ từ node + trigger ràng buộc + nét đứt cho ly hôn | 2.1–2.4 | 2d |
 | M4 | Panel chi tiết, thu gọn nhánh, re-root, tìm theo tên | 3.3–3.5, 4.1 | 2d |
 | M5 | Link chia sẻ chỉ-xem + xuất PNG | 5.1, 5.2 | 1d |
 | M6 | Mobile, a11y bàn phím, seed 200 người kiểm hiệu năng | NFR | 2d |
 
 **Tổng ≈ 13 ngày dev.** Đường găng là M2 — nếu `relatives-tree` không xử lý được ca "một người 3 vợ, con chia theo từng cặp", cả timeline lệch. Xem mục 5.
+
+**M2 (2026-08-20):** code xong — `src/lib/treeLayout.ts` (chuyển `people`+`relationships` sang input của `relatives-tree`, tự tách theo thành phần liên thông vì cây thật không phải lúc nào cũng liền một mảnh), `TreeNode`/`TreeView` (pan/zoom bằng `react-zoom-pan-pinch`, nút "Về gốc"/"Fit toàn cây"). `tsc -b`, `vite build`, `oxlint` sạch; đã chạy dev server + Playwright xác nhận trang không lỗi console. **Còn thiếu:** chưa soát được bằng mắt ca nhiều đời/nhiều vợ thật trong trình duyệt — vì chưa có UI tạo `relationships` (đó là M3), nên trên UI hiện tại mỗi người vẫn hiển thị như một cây độc lập. Đã tin ở phần thuật toán qua spike (mục 5), còn phần hiển thị thật cần chờ M3 hoặc seed tay để soát.
 
 ## 4. Thứ tự làm & lý do
 
