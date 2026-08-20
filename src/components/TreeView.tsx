@@ -3,7 +3,7 @@ import { TransformComponent, TransformWrapper, type ReactZoomPanPinchContentRef 
 import { listPeople, type Person } from '../lib/people'
 import { listRelationships, type Relationship } from '../lib/relationships'
 import { buildTreeLayout } from '../lib/treeLayout'
-import { NODE_HEIGHT, NODE_WIDTH, TreeNode } from './TreeNode'
+import { CARD_INSET, NODE_HEIGHT, NODE_WIDTH, TreeNode } from './TreeNode'
 
 // relatives-tree đặt mỗi node cách nhau đúng 2 đơn vị lưới theo cả 2 chiều
 // (SIZE trong constants.ts của lib) — nên 1 đơn vị lưới = nửa kích thước node.
@@ -104,8 +104,18 @@ export function TreeView({ treeId }: { treeId: string }) {
                 {layout.nodes.map((n) => (
                   <div
                     key={n.id}
-                    className="absolute"
-                    style={{ left: n.left * UNIT_X, top: n.top * UNIT_Y, width: NODE_WIDTH, height: NODE_HEIGHT }}
+                    // items/justify-center: thẻ bên trong co theo nội dung
+                    // (fit-content) — canh giữa trong ô lưới để tâm thẻ vẫn
+                    // khớp điểm nối mà relatives-tree tính (giữa ô), không bị
+                    // lệch trái khi thẻ hẹp hơn ô.
+                    className="absolute flex items-center justify-center"
+                    style={{
+                      left: n.left * UNIT_X,
+                      top: n.top * UNIT_Y,
+                      width: NODE_WIDTH,
+                      height: NODE_HEIGHT,
+                      padding: CARD_INSET,
+                    }}
                   >
                     <TreeNode person={n} />
                   </div>
