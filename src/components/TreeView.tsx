@@ -7,6 +7,7 @@ import {
 import { listPeople, type Person } from '../lib/people'
 import { listRelationships, type Relationship } from '../lib/relationships'
 import { buildTreeLayout } from '../lib/treeLayout'
+import { RelationshipModal, type RelationshipKind } from './RelationshipModal'
 import { CARD_INSET, NODE_HEIGHT, NODE_WIDTH, TreeNode } from './TreeNode'
 
 // relatives-tree đặt mỗi node cách nhau đúng 2 đơn vị lưới theo cả 2 chiều
@@ -20,6 +21,7 @@ export function TreeView({ treeId }: { treeId: string }) {
     null,
   )
   const [error, setError] = useState<string | null>(null)
+  const [modal, setModal] = useState<{ person: Person; kind: RelationshipKind } | null>(null)
   const transformRef = useRef<ReactZoomPanPinchContentRef>(null)
 
   useEffect(() => {
@@ -125,6 +127,19 @@ export function TreeView({ treeId }: { treeId: string }) {
                       strokeWidth={2}
                     />
                   ))}
+                  {/* FR-2.3: vợ/chồng đã ly hôn hoặc đã mất → nét đứt; đang kết hôn → nét liền. */}
+                  {layout.spouseConnectors.map((s, i) => (
+                    <line
+                      key={`spouse-${i}`}
+                      x1={s.x1 * UNIT_X}
+                      y1={s.y1 * UNIT_Y}
+                      x2={s.x2 * UNIT_X}
+                      y2={s.y2 * UNIT_Y}
+                      stroke="#78716c"
+                      strokeWidth={2}
+                      strokeDasharray={s.dashed ? '6 4' : undefined}
+                    />
+                  ))}
                 </svg>
                 {layout.nodes.map((n) => (
                   <div
@@ -139,13 +154,37 @@ export function TreeView({ treeId }: { treeId: string }) {
                       width: 'fit-content',
                     }}
                   >
-                    <TreeNode person={n} />
+                    <TreeNode
+                      person={n}
+                      onAddParent={() => setModal({ person: n, kind: 'parent' })}
+                      onAddSpouse={() => setModal({ person: n, kind: 'spouse' })}
+                      onAddChild={() => setModal({ person: n, kind: 'child' })}
+                    />
                   </div>
                 ))}
               </div>
             </TransformComponent>
           </TransformWrapper>
         </div>
+      )}
+
+      {modal && people && relationships && (
+        <RelationshipModal
+          treeId={treeId}
+          person={modal.person}
+          kind={modal.kind}
+          people={people}
+          relationships={relationships}
+          onClose={() => setModal(null)}
+          onPersonCreated={(p) => setPeople((prev) => [...(prev ?? []), p])}
+          onRelationshipCreated={(r) => setRelationships((prev) => [...(prev ?? []), r])}
+          onRelationshipChanged={(r) =>
+            setRelationships((prev) => prev?.map((x) => (x.id === r.id ? r : x)) ?? prev)
+          }
+          onRelationshipDeleted={(id) =>
+            setRelationships((prev) => prev?.filter((r) => r.id !== id) ?? prev)
+          }
+        />
       )}
     </div>
   )

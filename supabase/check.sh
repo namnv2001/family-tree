@@ -42,5 +42,42 @@ do $$ begin
 end $$;
 SQL
 
+# M3 / FR-2.2: trigger relationships_check phải chặn tối đa 2 cha/mẹ và vòng lặp tổ tiên.
+run <<'SQL'
+do $$
+declare
+  t_id uuid;
+  a uuid; b uuid; c uuid; d uuid;
+  failed boolean;
+begin
+  select id into t_id from trees limit 1;
+
+  insert into people (tree_id, full_name) values (t_id, 'A') returning id into a;
+  insert into people (tree_id, full_name) values (t_id, 'B') returning id into b;
+  insert into people (tree_id, full_name) values (t_id, 'C') returning id into c;
+  insert into people (tree_id, full_name) values (t_id, 'D') returning id into d;
+
+  -- Toi da 2 cha/me: A, B da la cha/me cua C -> C them D lam cha/me thu 3 phai fail.
+  insert into relationships (tree_id, type, from_id, to_id) values (t_id, 'parent_of', a, c);
+  insert into relationships (tree_id, type, from_id, to_id) values (t_id, 'parent_of', b, c);
+  failed := false;
+  begin
+    insert into relationships (tree_id, type, from_id, to_id) values (t_id, 'parent_of', d, c);
+  exception when others then
+    failed := true;
+  end;
+  assert failed, 'trigger khong chan duoc cha/me thu 3';
+
+  -- Vong lap: C la con cua A. A khong the la con cua C (A da la to tien cua C).
+  failed := false;
+  begin
+    insert into relationships (tree_id, type, from_id, to_id) values (t_id, 'parent_of', c, a);
+  exception when others then
+    failed := true;
+  end;
+  assert failed, 'trigger khong chan duoc vong lap to tien';
+end $$;
+SQL
+
 docker rm -f $C >/dev/null
 echo "OK"

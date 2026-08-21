@@ -2,7 +2,7 @@
 
 Ứng dụng web hiển thị cây gia phả đơn giản. Một người biên tập nhập dữ liệu thành viên, xem ra sơ đồ cây, chia sẻ link chỉ-xem cho họ hàng.
 
-**Trạng thái:** M0 + M1 xong — đăng nhập Google, CRUD thành viên (thêm/sửa/xóa + undo 10s), ảnh đại diện (crop vuông, Storage), tự lưu. M2 (hiển thị cây, tab "Cây") đã code xong — pan/zoom, fit toàn cây, về gốc — nhưng chưa có UI tạo quan hệ cha–mẹ–con/vợ–chồng (M3), nên mỗi người vẫn hiện thành một cây độc lập trên màn hình.
+**Trạng thái:** M0–M2 xong — đăng nhập Google, CRUD thành viên (thêm/sửa/xóa + undo 10s), ảnh đại diện (crop vuông, Storage), tự lưu, hiển thị cây (pan/zoom, fit toàn cây, về gốc). M3 (quan hệ) đã code xong — mỗi node có nút nhanh +Cha/Mẹ, +Vợ/Chồng, +Con; xóa liên kết không xóa người; cặp ly hôn/đã mất vẽ nét đứt; tối đa 2 cha/mẹ + chặn vòng lặp tổ tiên thực thi bằng trigger Postgres. Chưa click-test bằng trình duyệt thật (xem `docs/plan.md` mục M3) — cần thử tay trước khi dùng thật.
 
 Vite + React + TS + Tailwind, backend là Supabase (Postgres + Auth + Storage + RLS).
 
