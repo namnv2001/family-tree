@@ -5,7 +5,7 @@ import {
   type ReactZoomPanPinchContentRef,
 } from 'react-zoom-pan-pinch'
 import { listPeople, type Person } from '../lib/people'
-import { listRelationships, type Relationship } from '../lib/relationships'
+import { descendantsOf, listRelationships, type Relationship } from '../lib/relationships'
 import { buildTreeLayout } from '../lib/treeLayout'
 import { RelationshipModal, type RelationshipKind } from './RelationshipModal'
 import { CARD_INSET, NODE_HEIGHT, NODE_WIDTH, TreeNode } from './TreeNode'
@@ -41,6 +41,15 @@ export function TreeView({ treeId }: { treeId: string }) {
     if (!people || !relationships) return null
     return buildTreeLayout(people, relationships)
   }, [people, relationships])
+
+  // Highlight: dòng họ gốc = chính người gốc (primaryRootId) + mọi hậu duệ
+  // huyết thống của họ (parent_of, đệ quy) — KHÔNG tính vợ/chồng, vì họ là
+  // người kết hôn vào, không cùng huyết thống với dòng họ gốc. Dùng lại
+  // `descendantsOf` sẵn có (đang phục vụ RelationshipModal lọc vòng lặp).
+  const rootLineage = useMemo(() => {
+    if (!layout?.primaryRootId || !relationships) return null
+    return new Set([layout.primaryRootId, ...descendantsOf(layout.primaryRootId, relationships)])
+  }, [layout?.primaryRootId, relationships])
 
   function handleGoRoot() {
     const ref = transformRef.current
@@ -156,14 +165,19 @@ export function TreeView({ treeId }: { treeId: string }) {
                     style={{
                       left: n.left * UNIT_X,
                       top: n.top * UNIT_Y,
-                      minWidth: NODE_WIDTH,
+                      // Cố định đúng khổ ô lưới — không fit-content nữa. Node
+                      // absolute-position sát nhau theo tọa độ lưới cố định,
+                      // không tự reflow: ai rộng hơn ô của mình sẽ đè lên hàng
+                      // xóm bên cạnh (bug đã báo với tên dài). TreeNode tự cắt
+                      // bớt tên quá dài (truncate + tooltip) để luôn vừa khổ.
+                      width: NODE_WIDTH,
                       height: NODE_HEIGHT,
                       padding: CARD_INSET,
-                      width: 'fit-content',
                     }}
                   >
                     <TreeNode
                       person={n}
+                      isRootLineage={rootLineage?.has(n.id) ?? false}
                       onAddParent={() => setModal({ person: n, kind: 'parent' })}
                       onAddSpouse={() => setModal({ person: n, kind: 'spouse' })}
                       onAddChild={() => setModal({ person: n, kind: 'child' })}

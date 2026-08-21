@@ -4,9 +4,11 @@ import { Avatar } from './Avatar'
 
 // Kích thước Ô LƯỚI cây (px) — TreeView dùng để suy ra tỉ lệ px/đơn vị lưới
 // của relatives-tree (mỗi node chiếm đúng 2 đơn vị mỗi chiều, xem constants.ts
-// của lib: SIZE = 2) và làm sàn khổ tối thiểu cho thẻ (min-width ở wrapper
-// trong TreeView) — thẻ tên dài hơn ô thì tự nới rộng ra (width: fit-content),
-// không truncate.
+// của lib: SIZE = 2), và là khổ CỐ ĐỊNH của thẻ (width/height ở wrapper trong
+// TreeView) — tên dài hơn ô thì cắt bớt + "…" (truncate), xem đầy đủ qua
+// tooltip. Từng thử để thẻ tự nới rộng theo tên (fit-content) nhưng node
+// absolute-position sát nhau theo tọa độ lưới cố định, không tự reflow: ai
+// rộng hơn ô của mình sẽ đè lên hàng xóm — bug đã báo, quay lại khổ cố định.
 export const NODE_WIDTH = 224
 // +24px so với M2 (88) để chừa hàng nút nhanh FR-2.1 bên dưới, không đổi phần thân thẻ.
 export const NODE_HEIGHT = 112
@@ -18,29 +20,51 @@ export const CARD_INSET = 6
 
 export function TreeNode({
   person,
+  isRootLineage,
   onAddParent,
   onAddSpouse,
   onAddChild,
 }: {
   person: Person
+  // Highlight người thuộc dòng họ gốc (chính gốc + hậu duệ huyết thống) —
+  // phân biệt với vợ/chồng kết hôn vào (không tô). Tính ở TreeView (đọc
+  // descendantsOf), TreeNode chỉ lo hiển thị.
+  isRootLineage: boolean
   onAddParent: () => void
   onAddSpouse: () => void
   onAddChild: () => void
 }) {
   const deceased = person.is_deceased || !!person.death_date // FR-1.4
+  // Màu viền ưu tiên highlight dòng họ gốc; nền vẫn theo còn sống/đã mất như
+  // cũ — 2 tín hiệu độc lập, không đụng nhau (người gốc đã mất vẫn nhận biết
+  // được cả 2 vừa "đã mất" (nền xám) vừa "dòng họ gốc" (viền vàng)).
+  const borderColor = isRootLineage
+    ? 'border-amber-400'
+    : deceased
+      ? 'border-stone-400'
+      : 'border-stone-200'
 
   return (
     <div
       id={`tree-node-${person.id}`}
-      className={`flex h-full w-full flex-col overflow-hidden rounded-lg border text-left shadow-sm ${
-        deceased ? 'border-stone-400 bg-stone-50' : 'border-stone-200 bg-white'
+      className={`flex h-full w-full flex-col overflow-hidden rounded-lg border text-left shadow-sm ${borderColor} ${
+        deceased ? 'bg-stone-50' : 'bg-white'
       }`}
     >
-      <div className="flex flex-1 items-center gap-3 px-3">
+      <div className="flex flex-1 items-center gap-3 overflow-hidden px-3">
         <Avatar photoPath={person.photo_path} name={person.full_name} grayscale={deceased} size={48} />
-        <div>
-          <p className="text-sm font-medium text-stone-800">{person.full_name}</p>
-          <p className="text-xs text-stone-500">{formatLifespan(person)}</p>
+        {/* min-w-0: mặc định flex item không co nhỏ hơn nội dung của nó (kể cả
+            khi có truncate) — thiếu dòng này thì `truncate` bên dưới vô tác
+            dụng, tên dài vẫn đẩy card rộng ra đè card kế bên (đúng bug đã báo:
+            card của "tree-node" khác absolute-position sát nhau theo lưới
+            cố định, ai rộng hơn ô của mình thì đè lên hàng xóm, không tự
+            reflow). Card giờ CỐ ĐỊNH đúng khổ ô lưới (xem TreeView), tên dài
+            hơn cắt bớt + "…", xem đầy đủ bằng tooltip (title) khi hover. */}
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium text-stone-800" title={person.full_name}>
+            {person.full_name}
+          </p>
+          <p className="truncate text-xs text-stone-500">{formatLifespan(person)}</p>
         </div>
       </div>
       {/* FR-2.1: nút nhanh thêm quan hệ ngay trên node, không cần mở panel riêng. */}
