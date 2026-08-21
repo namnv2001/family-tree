@@ -205,8 +205,26 @@ function findComponents(people: Person[], relationships: Relationship[]): string
 // cao nhất được ghi nhận). Vợ/chồng của gốc tự động được lib kéo vào cùng
 // hàng — không cần chọn đúng người trong cặp.
 //
-// Trong SỐ các ứng viên hợp lệ đó, ưu tiên người không phải nữ (nam/chưa rõ,
-// đúng quy ước toLibGender) vì 2 lý do đã xác nhận bằng thực nghiệm:
+// Bug đã xác nhận bằng spike: `relatives-tree` CHỈ vẽ đúng MỘT nhánh tổ tiên
+// duy nhất — nhánh của chính `rootId`. Nếu root là người không có cha/mẹ chỉ
+// vì CHƯA NHẬP (ví dụ rể chưa khai cha/mẹ ruột), còn vợ/chồng của người đó lại
+// có cha/mẹ ghi nhận, thì cha/mẹ vợ/chồng đó bị lib ÂM THẦM LOẠI KHỎI CÂY dù
+// vẫn cùng một thành phần liên thông truyền vào calcTree — không phải bug ở
+// buildGraph/findComponents, chỉ là chọn nhầm root. Nên trong số các ứng viên
+// "không có cha/mẹ", ưu tiên người có vợ/chồng CŨNG không có cha/mẹ (đầu nhánh
+// thật) trước — chỉ chấp nhận ứng viên có vợ/chồng đã có cha/mẹ khi không còn
+// lựa chọn nào khác.
+// **Giới hạn đã biết:** cách này chỉ cứu được ca "1 người rể/dâu chưa rõ gốc
+// gác kết hôn vào 1 nhánh có gốc rõ ràng". Nếu CÙNG một cây có từ 2 nhánh rể/
+// dâu trở lên, mỗi nhánh có cha/mẹ riêng ở các đời khác nhau (ví dụ vừa có cha/
+// mẹ vợ của đời 1 vừa có cha/mẹ vợ của đời 3) — `relatives-tree` không có cách
+// nào vẽ đủ cả hai cùng lúc, vì rootId chỉ chọn được một nhánh. Chấp nhận vì
+// đây là giới hạn cấu trúc của thư viện (một cây = một nhánh tổ tiên), không
+// phải lỗi có thể sửa ở tầng chọn root.
+//
+// Trong SỐ các ứng viên "sạch" (hoặc toàn bộ ứng viên nếu không ai sạch), ưu
+// tiên người không phải nữ (nam/chưa rõ, đúng quy ước toLibGender) vì 2 lý do
+// đã xác nhận bằng thực nghiệm:
 // 1. Nếu gốc có vợ/chồng riêng (cả 2 đều không có parent) — relatives-tree
 //    LUÔN đặt chính node gốc bên trái trong cặp của nó, không xét giới tính gì
 //    cả. Chọn gốc là người chồng thì "chồng bên trái" tự đúng.
@@ -219,7 +237,13 @@ function findComponents(people: Person[], relationships: Relationship[]): string
 function pickRoot(compIds: string[], graph: Graph, personById: Map<string, Person>): string {
   const candidates = compIds.filter((id) => graph.parentsOf.get(id)!.length === 0)
   if (candidates.length === 0) return compIds[0]!
-  return candidates.find((id) => personById.get(id)?.gender !== 'female') ?? candidates[0]!
+
+  const noInLawAbove = (id: string) =>
+    graph.spousesOf.get(id)!.every((s) => graph.parentsOf.get(s.id)!.length === 0)
+  const clean = candidates.filter(noInLawAbove)
+  const pool = clean.length > 0 ? clean : candidates
+
+  return pool.find((id) => personById.get(id)?.gender !== 'female') ?? pool[0]!
 }
 
 // relatives-tree đặt mỗi cặp vợ/chồng nằm cùng hàng, tâm 2 node cách nhau đúng
