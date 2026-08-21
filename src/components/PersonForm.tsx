@@ -3,7 +3,7 @@ import type { Gender, NewPerson } from '../lib/people'
 
 export function PersonForm({ onAdd }: { onAdd: (input: NewPerson) => Promise<void> }) {
   const [fullName, setFullName] = useState('')
-  const [gender, setGender] = useState<Gender | ''>('')
+  const [gender, setGender] = useState<Gender>('male')
   const [birthDate, setBirthDate] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -18,9 +18,9 @@ export function PersonForm({ onAdd }: { onAdd: (input: NewPerson) => Promise<voi
     setBusy(true)
     setError(null)
     try {
-      await onAdd({ full_name: name, gender: gender || null, birth_date: birthDate.trim() || null })
+      await onAdd({ full_name: name, gender, birth_date: birthDate.trim() || null })
       setFullName('')
-      setGender('')
+      setGender('male')
       setBirthDate('')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Thêm thất bại.')
@@ -45,13 +45,11 @@ export function PersonForm({ onAdd }: { onAdd: (input: NewPerson) => Promise<voi
       <Field label="Giới tính">
         <select
           value={gender}
-          onChange={(e) => setGender(e.target.value as Gender | '')}
+          onChange={(e) => setGender(e.target.value as Gender)}
           className="rounded-md border border-stone-300 px-2 py-1.5"
         >
-          <option value="">Không rõ</option>
           <option value="male">Nam</option>
           <option value="female">Nữ</option>
-          <option value="other">Khác</option>
         </select>
       </Field>
       <Field label="Năm sinh">

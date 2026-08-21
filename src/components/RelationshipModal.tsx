@@ -199,7 +199,7 @@ function AddForm({
   const [mode, setMode] = useState<'existing' | 'new'>('existing')
   const [existingId, setExistingId] = useState('')
   const [newName, setNewName] = useState('')
-  const [newGender, setNewGender] = useState<Gender | ''>('')
+  const [newGender, setNewGender] = useState<Gender>('male')
   const [status, setStatus] = useState<SpouseStatus>('married')
   // Chỉ 1 vợ/chồng thì không có gì phải chọn — mặc định gắn con với cả hai
   // luôn (đúng AC), người dùng vẫn đổi được nếu con này thật ra chỉ có 1 cha/mẹ.
@@ -238,7 +238,7 @@ function AddForm({
           setError('Cần nhập họ tên.')
           return
         }
-        const created = await createPerson(treeId, { full_name: name, gender: newGender || null })
+        const created = await createPerson(treeId, { full_name: name, gender: newGender })
         onPersonCreated(created)
         otherId = created.id
       } else if (!otherId) {
@@ -268,7 +268,7 @@ function AddForm({
 
       setExistingId('')
       setNewName('')
-      setNewGender('')
+      setNewGender('male')
       setCoParentId('')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Thêm quan hệ thất bại.')
@@ -317,13 +317,11 @@ function AddForm({
           />
           <select
             value={newGender}
-            onChange={(e) => setNewGender(e.target.value as Gender | '')}
+            onChange={(e) => setNewGender(e.target.value as Gender)}
             className="rounded-md border border-stone-300 px-2 py-1.5 text-sm"
           >
-            <option value="">Không rõ</option>
             <option value="male">Nam</option>
             <option value="female">Nữ</option>
-            <option value="other">Khác</option>
           </select>
         </div>
       )}

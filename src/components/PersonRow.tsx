@@ -81,16 +81,15 @@ export function PersonRow({
           <label className="flex flex-col gap-1 text-sm text-stone-600">
             Giới tính
             <select
-              value={draft.gender ?? ''}
-              onChange={(e) =>
-                setDraft((d) => ({ ...d, gender: (e.target.value || null) as Draft['gender'] }))
-              }
+              // Dữ liệu cũ (trước khi bỏ "Không rõ"/"Khác") có thể còn null/'other'
+              // — 2 option đó không còn trong danh sách nên hiển thị tạm về Nam,
+              // KHÔNG tự ghi đè draft.gender (chỉ đổi thật khi người dùng chọn lại).
+              value={draft.gender === 'female' ? 'female' : 'male'}
+              onChange={(e) => setDraft((d) => ({ ...d, gender: e.target.value as Draft['gender'] }))}
               className="rounded-md border border-stone-300 px-2 py-1.5"
             >
-              <option value="">Không rõ</option>
               <option value="male">Nam</option>
               <option value="female">Nữ</option>
-              <option value="other">Khác</option>
             </select>
           </label>
           <label className="flex items-center gap-2 self-end pb-1.5 text-sm text-stone-600">
