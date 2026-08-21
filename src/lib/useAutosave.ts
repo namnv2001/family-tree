@@ -23,14 +23,22 @@ export function useAutosave<T>(
   const latest = useRef(value)
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const retryDelay = useRef(RETRY_START_MS)
-  const savedOnce = useRef(false)
+  // Giá trị lần cuối đã LÊN LỊCH lưu, khởi tạo = giá trị ban đầu từ server — so
+  // sánh THEO NỘI DUNG, không dùng cờ boolean "đã chạy lần đầu chưa" (cách cũ).
+  // Lý do: StrictMode (bọc ở main.tsx) chạy lại effect mount 2 lần (mount →
+  // cleanup → mount lại) để bắt lỗi thiếu cleanup — cờ boolean chỉ đúng ở lần
+  // chạy đầu, lần chạy giả lập thứ 2 thấy cờ đã true (ref không reset giữa 2
+  // lần) nên tưởng nhầm là thay đổi thật, tự lên lịch PATCH dù value y hệt lúc
+  // tải (bug quan sát được: vào danh sách N người bắn N PATCH vô ích). So sánh
+  // theo nội dung thì chịu được double-invoke: chạy lại với ĐÚNG giá trị cũ vẫn
+  // nhận ra "không đổi gì" nên bỏ qua, không phụ thuộc effect chạy mấy lần.
+  const lastScheduled = useRef(JSON.stringify(value))
 
   useEffect(() => {
     latest.current = value
-    if (!savedOnce.current) {
-      savedOnce.current = true
-      return // giá trị khởi tạo từ server — không cần lưu lại
-    }
+    const serialized = JSON.stringify(value)
+    if (serialized === lastScheduled.current) return
+    lastScheduled.current = serialized
 
     clearTimeout(timer.current)
     retryDelay.current = RETRY_START_MS
