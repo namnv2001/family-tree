@@ -97,6 +97,14 @@ export function TreeView({ treeId }: { treeId: string }) {
             maxScale={2}
             limitToBounds={false}
             centerOnInit
+            // Mặc định `smooth: true` của lib nhân bước zoom với deltaY THÔ của
+            // sự kiện lăn chuột — chuột thường trên Windows bắn deltaY ~100/nấc,
+            // bước zoom thành 0.015*100=1.5 (lớn hơn cả khoảng minScale-maxScale),
+            // mỗi cú lăn nhảy thẳng lên/xuống 2 đầu mút, cảm giác giật cục. Tắt
+            // `smooth` để bước zoom cố định theo `wheel.step`, không phụ thuộc
+            // deltaY của từng loại chuột/trackpad.
+            smooth={false}
+            wheel={{ step: 0.15 }}
           >
             <TransformComponent
               wrapperStyle={{ width: '100%', height: '100%' }}
