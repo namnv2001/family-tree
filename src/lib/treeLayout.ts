@@ -36,10 +36,6 @@ export type TreeLayout = {
 // mới thêm ở M1 chưa có quan hệ nào thì mỗi người là một "cây" riêng.
 const COMPONENT_GAP_UNITS = 4
 
-// relatives-tree đặt vợ/chồng ĐỤNG NHAU (đúng 2 đơn vị, không khe hở) — nới
-// thêm một chút cho dễ nhìn, tách biệt với sibling (xem widenSpouseGaps).
-const SPOUSE_GAP_EXTRA_UNITS = 0.6
-
 // relatives-tree cần gender 'male'|'female' cho MỖI node để quyết định thứ tự
 // trái/phải khi xếp cặp vợ chồng — không phải giới tính hiển thị. Field gender
 // thật (kể cả 'other' / chưa rõ) vẫn giữ nguyên ở DB và trên UI, chỗ này chỉ
@@ -256,72 +252,6 @@ function buildSpouseConnectors(
   return out
 }
 
-// Nới khe hở vợ/chồng: relatives-tree luôn đặt 2 người CHẠM NHAU (đúng 2 đơn
-// vị lưới), không phân biệt đó là vợ/chồng hay anh chị em — không có tham số
-// nào của lib chỉnh riêng khoảng cách này. Cách làm: coi mỗi cặp vợ/chồng
-// đang chạm nhau là một "ranh giới" trên trục X, rồi CHÈN thêm khoảng trống
-// tại đúng ranh giới đó — dịch phải mọi tọa độ (node lẫn connector) có x lớn
-// hơn hoặc bằng ranh giới, cộng dồn theo số ranh giới nằm bên trái nó. Đây là
-// phép biến đổi cộng dồn đơn điệu trên toàn trục X (không hoán đổi vị trí ai
-// với ai) nên áp dụng đồng loạt cho node/connector/spouseConnector là an toàn
-// tuyệt đối — không thể làm lệch đường nối, dù áp dụng cho cả cây thay vì
-// riêng từng hàng (khe hở rộng thêm lan sang các nhánh khác ở bên phải ranh
-// giới đó — chấp nhận được vì chỉ nới "một chút" theo yêu cầu, không đáng để
-// đổi sang tính lại theo từng hàng riêng, phức tạp hơn nhiều).
-function widenSpouseGaps(
-  nodes: PositionedPerson[],
-  connectors: Connector[],
-  spouseConnectors: SpouseConnector[],
-): { nodes: PositionedPerson[]; connectors: Connector[]; spouseConnectors: SpouseConnector[]; extraWidth: number } {
-  const boundaries = [
-    ...new Set(
-      spouseConnectors
-        .filter((s) => s.x2 - s.x1 === 2) // đúng 2 cặp CHẠM nhau — dài hơn nghĩa là đã có node khác chen giữa
-        .map((s) => s.x2 - 1), // s.x2 là TÂM của người bên phải (person.left + 1) — trừ 1 ra đúng góc trái của họ, để node của họ dịch phải theo, không bị bỏ sót
-    ),
-  ].sort((a, b) => a - b)
-
-  if (boundaries.length === 0) return { nodes, connectors, spouseConnectors, extraWidth: 0 }
-
-  // Node: `left` là MÉP TRÁI, và ranh giới của một cặp đúng bằng mép trái của
-  // người bên phải cặp đó — nên "x === ranh giới" ở đây nghĩa là "đây chính là
-  // người bên phải", phải dịch TRỌN như người đứng hẳn bên phải khe.
-  const shiftForNode = (x: number) =>
-    boundaries.filter((b) => x >= b).length * SPOUSE_GAP_EXTRA_UNITS
-
-  // Connector: mọi tọa độ ở đây là TÂM (person.left+1) trừ duy nhất một loại —
-  // trục dọc nối cha/mẹ xuống hàng con, tọa độ x của nó chính là ĐIỂM GIỮA 2
-  // tim vợ/chồng chạm nhau, tức trùng khớp giá trị ranh giới. Tâm một node thì
-  // không bao giờ trùng ranh giới (luôn ở b-1 hoặc b+1), nên "x === ranh giới"
-  // chỉ có thể là trục này — nó nằm GIỮA khe vừa chèn nên chỉ dịch NỬA, để sau
-  // khi 2 người dịch xong trục vẫn đúng điểm giữa của họ (người trái đứng yên,
-  // người phải dịch trọn). Dịch trọn ở đây (như node) sẽ kéo trục lệch hẳn về
-  // phía người phải — chính là dáng "xiên" sếp thấy trên hình.
-  const shiftForConnector = (x: number) =>
-    boundaries.reduce(
-      (sum, b) => sum + (x > b ? SPOUSE_GAP_EXTRA_UNITS : x === b ? SPOUSE_GAP_EXTRA_UNITS / 2 : 0),
-      0,
-    )
-
-  return {
-    nodes: nodes.map((n) => ({ ...n, left: n.left + shiftForNode(n.left) })),
-    connectors: connectors.map(
-      ([x1, y1, x2, y2]): Connector => [
-        x1 + shiftForConnector(x1),
-        y1,
-        x2 + shiftForConnector(x2),
-        y2,
-      ],
-    ),
-    spouseConnectors: spouseConnectors.map((s) => ({
-      ...s,
-      x1: s.x1 + shiftForConnector(s.x1),
-      x2: s.x2 + shiftForConnector(s.x2),
-    })),
-    extraWidth: boundaries.length * SPOUSE_GAP_EXTRA_UNITS,
-  }
-}
-
 export function buildTreeLayout(people: Person[], relationships: Relationship[]): TreeLayout {
   if (people.length === 0)
     return { nodes: [], connectors: [], spouseConnectors: [], canvas: { width: 0, height: 0 }, primaryRootId: null }
@@ -373,14 +303,13 @@ export function buildTreeLayout(people: Person[], relationships: Relationship[])
     spouseConnectors.map((s) => segmentKey([s.x1, s.y1, s.x2, s.y2])),
   )
   const plainConnectors = connectors.filter((c) => !spouseSegments.has(segmentKey(c)))
-  const widened = widenSpouseGaps(nodes, plainConnectors, spouseConnectors)
 
   return {
-    nodes: widened.nodes,
-    connectors: widened.connectors,
-    spouseConnectors: widened.spouseConnectors,
+    nodes,
+    connectors: plainConnectors,
+    spouseConnectors,
     canvas: {
-      width: Math.max(offsetX - COMPONENT_GAP_UNITS, 0) + widened.extraWidth,
+      width: Math.max(offsetX - COMPONENT_GAP_UNITS, 0),
       height: maxHeight,
     },
     primaryRootId,
