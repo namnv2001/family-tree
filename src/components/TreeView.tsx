@@ -1,3 +1,4 @@
+import { toPng } from 'html-to-image'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   TransformComponent,
@@ -17,10 +18,24 @@ import { TreeSearch } from './TreeSearch'
 const UNIT_X = NODE_WIDTH / 2
 const UNIT_Y = NODE_HEIGHT / 2
 
-export function TreeView({ treeId }: { treeId: string }) {
-  const [people, setPeople] = useState<Person[] | null>(null)
+export function TreeView({
+  treeId,
+  readOnlyData,
+}: {
+  // Cây của chính chủ (đăng nhập, sửa được) — TreeView tự tải qua listPeople/
+  // listRelationships. Bỏ qua khi xem qua link chia sẻ.
+  treeId?: string
+  // FR-5.1: xem qua link chia sẻ — dữ liệu đã tải sẵn (qua get_shared_tree,
+  // xem lib/share.ts) từ trước khi TreeView mount, không tự fetch gì thêm
+  // (không có treeId để fetch, và cũng không có quyền — RLS chỉ mở đường đọc
+  // qua đúng RPC đó). Có mặt prop này = chế độ chỉ-xem: ẩn 3 nút nhanh thêm
+  // quan hệ (AC "không thấy nút sửa/xóa nào"), không mở RelationshipModal.
+  readOnlyData?: { people: Person[]; relationships: Relationship[] }
+}) {
+  const readOnly = !treeId
+  const [people, setPeople] = useState<Person[] | null>(readOnlyData?.people ?? null)
   const [relationships, setRelationships] = useState<Relationship[] | null>(
-    null,
+    readOnlyData?.relationships ?? null,
   )
   const [error, setError] = useState<string | null>(null)
   const [modal, setModal] = useState<{ person: Person; kind: RelationshipKind } | null>(null)
@@ -35,9 +50,13 @@ export function TreeView({ treeId }: { treeId: string }) {
   // riêng khỏi các state trên vì có handler cần MỞ LẠI một nhánh đã thu gọn
   // trước khi node đích tồn tại trong DOM (xem effect dưới + `focusPerson`).
   const [focusTarget, setFocusTarget] = useState<string | null>(null)
+  // FR-5.2: đang render ảnh PNG — disable 2 nút xuất, tránh bấm 2 lần chồng nhau.
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
   const transformRef = useRef<ReactZoomPanPinchContentRef>(null)
 
   useEffect(() => {
+    if (!treeId) return // chế độ chia sẻ: dữ liệu đã có sẵn qua readOnlyData, không fetch.
     Promise.all([listPeople(treeId), listRelationships(treeId)])
       .then(([p, r]) => {
         setPeople(p)
@@ -175,12 +194,44 @@ export function TreeView({ treeId }: { treeId: string }) {
     ref.centerView(scale, 200)
   }
 
+  // FR-5.2: xuất PNG khung nhìn hiện tại (wrapperComponent — đúng phần đang
+  // hiện trên màn, vì overflow-hidden + transform pan/zoom hiện ĐANG áp ở đó)
+  // hoặc toàn cây (contentComponent — div chứa full canvas, kích thước cố
+  // định theo layout.canvas, không phụ thuộc đang cuộn/zoom tới đâu). Cùng
+  // một hàm `toPng` của html-to-image cho cả 2, chỉ khác node truyền vào.
+  async function exportPng(kind: 'viewport' | 'full') {
+    const ref = transformRef.current
+    const el = kind === 'viewport' ? ref?.instance.wrapperComponent : ref?.instance.contentComponent
+    if (!el) return
+    setExportError(null)
+    setExporting(true)
+    try {
+      // backgroundColor: cả wrapperComponent và contentComponent đều không tự
+      // có nền (màu bg-stone-100 nằm ở div CHA của TransformWrapper, không
+      // inherit qua CSS) — không truyền thì PNG xuất ra nền trong suốt, nhìn
+      // như bị lỗi khi mở bằng trình xem ảnh mặc định (thường tô đen/trắng).
+      const dataUrl = await toPng(el, { backgroundColor: '#f5f5f4' })
+      const a = document.createElement('a')
+      a.href = dataUrl
+      a.download = kind === 'viewport' ? 'cay-gia-pha-khung-nhin.png' : 'cay-gia-pha-toan-canh.png'
+      a.click()
+    } catch {
+      // Nguyên nhân phổ biến nhất: ảnh đại diện tải từ domain khác (Supabase
+      // Storage) không có header CORS cho phép đọc pixel — html-to-image
+      // không nhúng được ảnh đó vào SVG trung gian. Chưa có browser tool để
+      // xác nhận thật trên project thật (xem docs/plan.md mục M5).
+      setExportError('Xuất ảnh thất bại — có thể do ảnh đại diện tải từ nguồn ngoài.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   if (error) return <p className="p-4 text-red-600">{error}</p>
   if (!layout) return <p className="p-4 text-stone-400">Đang tải…</p>
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex items-center gap-2 border-b border-stone-200 px-4 py-2">
+      <div className="flex flex-wrap items-center gap-2 border-b border-stone-200 px-4 py-2">
         <button
           onClick={handleGoRoot}
           disabled={!layout.primaryRootId}
@@ -195,6 +246,22 @@ export function TreeView({ treeId }: { treeId: string }) {
         >
           Fit toàn cây
         </button>
+        {/* FR-5.2 */}
+        <button
+          onClick={() => exportPng('viewport')}
+          disabled={exporting || layout.nodes.length === 0}
+          className="rounded-md border border-stone-300 px-3 py-1.5 text-sm hover:bg-stone-50 disabled:opacity-50"
+        >
+          Xuất khung nhìn
+        </button>
+        <button
+          onClick={() => exportPng('full')}
+          disabled={exporting || layout.nodes.length === 0}
+          className="rounded-md border border-stone-300 px-3 py-1.5 text-sm hover:bg-stone-50 disabled:opacity-50"
+        >
+          Xuất toàn cây
+        </button>
+        {exportError && <span className="text-sm text-red-600">{exportError}</span>}
         <div className="ml-auto">
           <TreeSearch people={people ?? []} onSelect={handleJumpTo} />
         </div>
@@ -289,9 +356,9 @@ export function TreeView({ treeId }: { treeId: string }) {
                       hiddenCount={hiddenCountByNode.get(n.id) ?? 0}
                       onSelect={() => setSelectedPersonId(n.id)}
                       onToggleCollapse={() => toggleCollapse(n.id)}
-                      onAddParent={() => setModal({ person: n, kind: 'parent' })}
-                      onAddSpouse={() => setModal({ person: n, kind: 'spouse' })}
-                      onAddChild={() => setModal({ person: n, kind: 'child' })}
+                      onAddParent={readOnly ? undefined : () => setModal({ person: n, kind: 'parent' })}
+                      onAddSpouse={readOnly ? undefined : () => setModal({ person: n, kind: 'spouse' })}
+                      onAddChild={readOnly ? undefined : () => setModal({ person: n, kind: 'child' })}
                     />
                   </div>
                 ))}
@@ -316,7 +383,7 @@ export function TreeView({ treeId }: { treeId: string }) {
         </div>
       )}
 
-      {modal && people && relationships && (
+      {modal && people && relationships && treeId && (
         <RelationshipModal
           treeId={treeId}
           person={modal.person}

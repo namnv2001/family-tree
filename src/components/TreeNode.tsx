@@ -45,9 +45,13 @@ export function TreeNode({
   hiddenCount: number
   onSelect: () => void
   onToggleCollapse: () => void
-  onAddParent: () => void
-  onAddSpouse: () => void
-  onAddChild: () => void
+  // FR-5.1 AC: người xem qua link chia sẻ "không thấy nút sửa/xóa nào" —
+  // optional, không phải boolean `readOnly` riêng: TreeView đơn giản không
+  // truyền 3 hàm này ở chế độ chia sẻ, và TypeScript tự narrow đủ-cả-3 hay
+  // không trong nhánh render dưới, khỏi cần `!` non-null assertion.
+  onAddParent?: () => void
+  onAddSpouse?: () => void
+  onAddChild?: () => void
 }) {
   const deceased = person.is_deceased || !!person.death_date // FR-1.4
   // Màu viền ưu tiên highlight dòng họ gốc; nền vẫn theo còn sống/đã mất như
@@ -90,12 +94,17 @@ export function TreeNode({
           <p className="truncate text-xs text-stone-500">{formatLifespan(person)}</p>
         </div>
       </button>
-      {/* FR-2.1: nút nhanh thêm quan hệ ngay trên node, không cần mở panel riêng. */}
-      <div className="flex divide-x divide-stone-200 border-t border-stone-200 text-[10px] text-stone-500">
-        <QuickButton label="Cha/Mẹ" title="Thêm cha/mẹ" onClick={onAddParent} />
-        <QuickButton label="Vợ/Chồng" title="Thêm vợ/chồng" onClick={onAddSpouse} />
-        <QuickButton label="Con" title="Thêm con" onClick={onAddChild} />
-      </div>
+      {/* FR-2.1: nút nhanh thêm quan hệ ngay trên node, không cần mở panel
+          riêng. Ẩn hẳn ở chế độ chia sẻ (onAddParent thiếu → cả 3 cũng thiếu,
+          TreeView luôn truyền theo cặp đủ-hoặc-không) — nút phần trên (avatar
+          + tên) tự giãn full-height lấp khoảng trống, không để hàng trống lộ ra. */}
+      {onAddParent && onAddSpouse && onAddChild && (
+        <div className="flex divide-x divide-stone-200 border-t border-stone-200 text-[10px] text-stone-500">
+          <QuickButton label="Cha/Mẹ" title="Thêm cha/mẹ" onClick={onAddParent} />
+          <QuickButton label="Vợ/Chồng" title="Thêm vợ/chồng" onClick={onAddSpouse} />
+          <QuickButton label="Con" title="Thêm con" onClick={onAddChild} />
+        </div>
+      )}
       {/* FR-3.3 AC: nhánh thu gọn hiện badge số người đang ẩn. Bấm để mở lại
           ngay tại đây — không bắt phải mở panel chi tiết mới mở được (đó là
           nơi BẮT ĐẦU thu gọn, xem PersonPanel — vì mở-lại thì hợp không cần

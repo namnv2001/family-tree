@@ -2,7 +2,7 @@
 
 Ứng dụng web hiển thị cây gia phả đơn giản. Một người biên tập nhập dữ liệu thành viên, xem ra sơ đồ cây, chia sẻ link chỉ-xem cho họ hàng.
 
-**Trạng thái:** M0–M2 xong — đăng nhập Google, CRUD thành viên (thêm/sửa/xóa + undo 10s), ảnh đại diện (crop vuông, Storage), tự lưu, hiển thị cây (pan/zoom, fit toàn cây, về gốc). M3 (quan hệ) đã code xong — mỗi node có nút nhanh +Cha/Mẹ, +Vợ/Chồng, +Con; xóa liên kết không xóa người; cặp ly hôn/đã mất vẽ nét đứt; tối đa 2 cha/mẹ + chặn vòng lặp tổ tiên thực thi bằng trigger Postgres. M4 đã code xong — click node mở panel chi tiết (ảnh, thông tin, cha mẹ/vợ chồng/con click nhảy tới được); thu gọn/mở rộng nhánh (badge số người đang ẩn); "Xem cây từ người này" (pan/zoom camera tới người đó, không ẩn nhánh nào — đổi hướng sau khi phát hiện đổi rootId của thuật toán làm mất cả cô/chú/bác của người được chọn); tìm theo tên không phân biệt dấu. Chưa click-test bằng trình duyệt thật (xem `docs/plan.md` mục M3, M4) — cần thử tay trước khi dùng thật.
+**Trạng thái:** M0–M2 xong — đăng nhập Google, CRUD thành viên (thêm/sửa/xóa + undo 10s), ảnh đại diện (crop vuông, Storage), tự lưu, hiển thị cây (pan/zoom, fit toàn cây, về gốc). M3 (quan hệ) đã code xong — mỗi node có nút nhanh +Cha/Mẹ, +Vợ/Chồng, +Con; xóa liên kết không xóa người; cặp ly hôn/đã mất vẽ nét đứt; tối đa 2 cha/mẹ + chặn vòng lặp tổ tiên thực thi bằng trigger Postgres. M4 đã code xong — click node mở panel chi tiết (ảnh, thông tin, cha mẹ/vợ chồng/con click nhảy tới được); thu gọn/mở rộng nhánh (badge số người đang ẩn); "Xem cây từ người này" (pan/zoom camera tới người đó, không ẩn nhánh nào — đổi hướng sau khi phát hiện đổi rootId của thuật toán làm mất cả cô/chú/bác của người được chọn); tìm theo tên không phân biệt dấu. M5 đã code xong — link chia sẻ chỉ-xem (nút "Chia sẻ" ở header, bật/tắt/tạo lại, đọc qua hàm Postgres riêng nên không sửa/xóa được gì dù có link) và xuất ảnh PNG (khung nhìn hiện tại hoặc toàn cây). Chưa click-test bằng trình duyệt thật (xem `docs/plan.md` mục M3–M5) — cần thử tay trước khi dùng thật; phần DB/RLS của M5 đã verify bằng Docker thật.
 
 Vite + React + TS + Tailwind, backend là Supabase (Postgres + Auth + Storage + RLS).
 
@@ -21,7 +21,7 @@ Vite + React + TS + Tailwind, backend là Supabase (Postgres + Auth + Storage + 
 
 ### 2. Chạy migration
 
-**SQL Editor → New query** → dán toàn bộ [supabase/migrations/0001_init.sql](supabase/migrations/0001_init.sql) → **Run**. Lặp lại với [0002_photos_storage.sql](supabase/migrations/0002_photos_storage.sql) (tạo bucket `photos` cho ảnh đại diện, FR-1.3) — **phải chạy sau** 0001, theo đúng thứ tự số.
+**SQL Editor → New query** → dán toàn bộ nội dung từng file trong [supabase/migrations/](supabase/migrations/) → **Run**, **theo đúng thứ tự số** (0001, 0002, 0003, 0004, …) — file sau có thể phụ thuộc bảng/hàm của file trước.
 
 Kiểm: **Table Editor** thấy 3 bảng `trees`, `people`, `relationships`, cả 3 đều báo *RLS enabled*. **Storage** thấy bucket `photos`, đánh dấu *Private*.
 
