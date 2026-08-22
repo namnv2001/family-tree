@@ -5,10 +5,12 @@ import {
   type ReactZoomPanPinchContentRef,
 } from 'react-zoom-pan-pinch'
 import { listPeople, type Person } from '../lib/people'
-import { descendantsOf, listRelationships, type Relationship } from '../lib/relationships'
+import { collapsedBranchIds, descendantsOf, listRelationships, type Relationship } from '../lib/relationships'
 import { buildTreeLayout } from '../lib/treeLayout'
+import { PersonPanel } from './PersonPanel'
 import { RelationshipModal, type RelationshipKind } from './RelationshipModal'
 import { CARD_INSET, NODE_HEIGHT, NODE_WIDTH, TreeNode } from './TreeNode'
+import { TreeSearch } from './TreeSearch'
 
 // relatives-tree đặt mỗi node cách nhau đúng 2 đơn vị lưới theo cả 2 chiều
 // (SIZE trong constants.ts của lib) — nên 1 đơn vị lưới = nửa kích thước node.
@@ -22,6 +24,17 @@ export function TreeView({ treeId }: { treeId: string }) {
   )
   const [error, setError] = useState<string | null>(null)
   const [modal, setModal] = useState<{ person: Person; kind: RelationshipKind } | null>(null)
+  // FR-3.5: người đang mở panel chi tiết — giữ ID, không giữ bản Person sao
+  // chép, để luôn đọc đúng dữ liệu mới nhất từ `people` mỗi lần render (không
+  // cần đồng bộ tay khi people đổi).
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null)
+  // FR-3.3: tập người đang bị thu gọn nhánh — chỉ là view-state (không lưu
+  // DB, không phải yêu cầu của FR-3.3), mất khi rời tab/tải lại trang.
+  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set())
+  // Người cần pan/zoom tới ngay khi node của họ xuất hiện trong DOM — tách
+  // riêng khỏi các state trên vì có handler cần MỞ LẠI một nhánh đã thu gọn
+  // trước khi node đích tồn tại trong DOM (xem effect dưới + `focusPerson`).
+  const [focusTarget, setFocusTarget] = useState<string | null>(null)
   const transformRef = useRef<ReactZoomPanPinchContentRef>(null)
 
   useEffect(() => {
@@ -35,26 +48,116 @@ export function TreeView({ treeId }: { treeId: string }) {
       )
   }, [treeId])
 
-  // FR-3.1: tính toán layout (relatives-tree) chỉ khi dữ liệu đổi, không phải
-  // mỗi lần pan/zoom re-render.
+  // FR-3.3: nhánh thu gọn → loại hẳn người bị ẩn khỏi ĐẦU VÀO trước khi tính
+  // layout, để buildTreeLayout không cần biết gì về "thu gọn" — tái dùng đúng
+  // cơ chế tách thành phần liên thông đã có sẵn (người bị ẩn coi như không
+  // tồn tại, giống cách app đã xử lý dữ liệu mồ côi ở buildGraph). Badge số
+  // người ẩn (AC FR-3.3) tính kèm luôn ở đây, theo đúng cùng một hàm.
+  const { visiblePeople, visibleRelationships, hiddenCountByNode } = useMemo(() => {
+    if (!people || !relationships || collapsedIds.size === 0)
+      return {
+        visiblePeople: people,
+        visibleRelationships: relationships,
+        hiddenCountByNode: new Map<string, number>(),
+      }
+    const hiddenCountByNode = new Map<string, number>()
+    const hiddenIds = new Set<string>()
+    for (const id of collapsedIds) {
+      const hidden = collapsedBranchIds(id, people, relationships)
+      hiddenCountByNode.set(id, hidden.size)
+      for (const h of hidden) hiddenIds.add(h)
+    }
+    return {
+      visiblePeople: people.filter((p) => !hiddenIds.has(p.id)),
+      visibleRelationships: relationships.filter((r) => !hiddenIds.has(r.from_id) && !hiddenIds.has(r.to_id)),
+      hiddenCountByNode,
+    }
+  }, [people, relationships, collapsedIds])
+
+  // FR-3.1: tính toán layout (relatives-tree) chỉ khi dữ liệu/thu gọn đổi,
+  // không phải mỗi lần pan/zoom re-render.
   const layout = useMemo(() => {
-    if (!people || !relationships) return null
-    return buildTreeLayout(people, relationships)
-  }, [people, relationships])
+    if (!visiblePeople || !visibleRelationships) return null
+    return buildTreeLayout(visiblePeople, visibleRelationships)
+  }, [visiblePeople, visibleRelationships])
+
+  // Ai đang có con (theo dữ liệu ĐẦY ĐỦ, không phải bản đã lọc thu gọn) — để
+  // quyết định panel có hiện nút "Thu gọn nhánh" hay không. Dùng relationships
+  // gốc vì một người bị thu gọn vẫn phải giữ được nút bấm để mở lại.
+  const idsWithChildren = useMemo(() => {
+    if (!relationships) return new Set<string>()
+    return new Set(relationships.filter((r) => r.type === 'parent_of').map((r) => r.from_id))
+  }, [relationships])
 
   // Highlight: dòng họ gốc = chính người gốc (primaryRootId) + mọi hậu duệ
   // huyết thống của họ (parent_of, đệ quy) — KHÔNG tính vợ/chồng, vì họ là
   // người kết hôn vào, không cùng huyết thống với dòng họ gốc. Dùng lại
   // `descendantsOf` sẵn có (đang phục vụ RelationshipModal lọc vòng lặp).
+  // Đọc `relationships` ĐẦY ĐỦ (không phải bản lọc thu gọn) — dòng họ ai
+  // thuộc về không đổi vì một nhánh đang bị ẩn tạm trên màn hình.
   const rootLineage = useMemo(() => {
     if (!layout?.primaryRootId || !relationships) return null
     return new Set([layout.primaryRootId, ...descendantsOf(layout.primaryRootId, relationships)])
   }, [layout?.primaryRootId, relationships])
 
-  function handleGoRoot() {
+  const selectedPerson = people?.find((p) => p.id === selectedPersonId) ?? null
+
+  // FR-3.5/FR-4.1: "nhảy tới" một người có thể đang bị ẩn trong nhánh đã thu
+  // gọn (của chính họ hoặc một tổ tiên bất kỳ) — tự mở lại nhánh đang che
+  // trước, để hành động "nhảy tới" không bao giờ thất bại âm thầm.
+  function ensureVisible(personId: string) {
+    if (!people || !relationships) return
+    setCollapsedIds((prev) => {
+      if (prev.size === 0) return prev
+      let changed = false
+      const next = new Set(prev)
+      for (const id of prev) {
+        if (collapsedBranchIds(id, people, relationships).has(personId)) {
+          next.delete(id)
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  }
+
+  // Không gọi zoomToElement ngay trong handler: DOM lúc đó vẫn còn tọa độ CŨ
+  // (React gộp state update, chưa commit lại trong cùng lần gọi) — đặc biệt
+  // khi ensureVisible vừa mở lại một nhánh, node đích còn CHƯA TỒN TẠI trong
+  // DOM. Effect chạy SAU khi commit nên luôn thấy đúng, kể cả phải chờ thêm
+  // một vòng render (mở nhánh trước, có layout mới, rồi mới thấy node).
+  useEffect(() => {
+    if (!focusTarget) return
     const ref = transformRef.current
-    if (!ref || !layout?.primaryRootId) return
-    ref.zoomToElement(`tree-node-${layout.primaryRootId}`, 1, 400)
+    if (ref && document.getElementById(`tree-node-${focusTarget}`)) {
+      ref.zoomToElement(`tree-node-${focusTarget}`, 1, 400)
+      setFocusTarget(null)
+    }
+  }, [focusTarget, layout])
+
+  function focusPerson(personId: string) {
+    ensureVisible(personId)
+    setFocusTarget(personId)
+  }
+
+  // Dùng chung cho: click node (đã ở PersonPanel/TreeNode), chọn kết quả tìm
+  // kiếm (FR-4.1), click người liên quan trong panel (FR-3.5 "nhảy tới").
+  function handleJumpTo(person: Person) {
+    setSelectedPersonId(person.id)
+    focusPerson(person.id)
+  }
+
+  function toggleCollapse(id: string) {
+    setCollapsedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function handleGoRoot() {
+    if (layout?.primaryRootId) focusPerson(layout.primaryRootId)
   }
 
   function handleFit() {
@@ -92,6 +195,9 @@ export function TreeView({ treeId }: { treeId: string }) {
         >
           Fit toàn cây
         </button>
+        <div className="ml-auto">
+          <TreeSearch people={people ?? []} onSelect={handleJumpTo} />
+        </div>
       </div>
 
       {layout.nodes.length === 0 ? (
@@ -99,7 +205,7 @@ export function TreeView({ treeId }: { treeId: string }) {
           Chưa có ai trong cây. Thêm người ở tab Danh sách.
         </p>
       ) : (
-        <div className="flex-1 overflow-hidden bg-stone-100">
+        <div className="relative flex-1 overflow-hidden bg-stone-100">
           <TransformWrapper
             ref={transformRef}
             minScale={0.15}
@@ -178,6 +284,11 @@ export function TreeView({ treeId }: { treeId: string }) {
                     <TreeNode
                       person={n}
                       isRootLineage={rootLineage?.has(n.id) ?? false}
+                      isSelected={selectedPersonId === n.id}
+                      collapsed={collapsedIds.has(n.id)}
+                      hiddenCount={hiddenCountByNode.get(n.id) ?? 0}
+                      onSelect={() => setSelectedPersonId(n.id)}
+                      onToggleCollapse={() => toggleCollapse(n.id)}
                       onAddParent={() => setModal({ person: n, kind: 'parent' })}
                       onAddSpouse={() => setModal({ person: n, kind: 'spouse' })}
                       onAddChild={() => setModal({ person: n, kind: 'child' })}
@@ -187,6 +298,21 @@ export function TreeView({ treeId }: { treeId: string }) {
               </div>
             </TransformComponent>
           </TransformWrapper>
+
+          {selectedPerson && people && relationships && (
+            <PersonPanel
+              person={selectedPerson}
+              people={people}
+              relationships={relationships}
+              collapsed={collapsedIds.has(selectedPerson.id)}
+              hiddenCount={hiddenCountByNode.get(selectedPerson.id) ?? 0}
+              canCollapse={idsWithChildren.has(selectedPerson.id)}
+              onClose={() => setSelectedPersonId(null)}
+              onJumpTo={handleJumpTo}
+              onToggleCollapse={() => toggleCollapse(selectedPerson.id)}
+              onFocus={() => focusPerson(selectedPerson.id)}
+            />
+          )}
         </div>
       )}
 

@@ -67,6 +67,20 @@ export async function countRelationships(personId: string): Promise<number> {
   return count ?? 0
 }
 
+// FR-4.1: bỏ dấu để so khớp gần đúng — "nguyen van" phải khớp "Nguyễn Văn A".
+// Một dòng stdlib đủ dùng (đã chốt ở plan.md mục 1), không cần lib fuzzy-search riêng.
+export function stripDiacritics(s: string): string {
+  return s.normalize('NFD').replace(/\p{Diacritic}/gu, '')
+}
+
+// So khớp theo họ tên hoặc tên gọi khác, không phân biệt hoa/thường và dấu.
+export function matchesName(person: Pick<Person, 'full_name' | 'alias'>, query: string): boolean {
+  const q = stripDiacritics(query.trim().toLowerCase())
+  if (!q) return false
+  if (stripDiacritics(person.full_name.toLowerCase()).includes(q)) return true
+  return !!person.alias && stripDiacritics(person.alias.toLowerCase()).includes(q)
+}
+
 // FR-1.4: nhãn "năm sinh – năm mất" khi người đã mất, "Sinh {năm}" khi còn sống.
 export function formatLifespan(
   p: Pick<Person, 'birth_date' | 'death_date' | 'is_deceased'>,

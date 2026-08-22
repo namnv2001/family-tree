@@ -2,7 +2,7 @@
 
 Ứng dụng web hiển thị cây gia phả đơn giản. Một người biên tập nhập dữ liệu thành viên, xem ra sơ đồ cây, chia sẻ link chỉ-xem cho họ hàng.
 
-**Trạng thái:** M0–M2 xong — đăng nhập Google, CRUD thành viên (thêm/sửa/xóa + undo 10s), ảnh đại diện (crop vuông, Storage), tự lưu, hiển thị cây (pan/zoom, fit toàn cây, về gốc). M3 (quan hệ) đã code xong — mỗi node có nút nhanh +Cha/Mẹ, +Vợ/Chồng, +Con; xóa liên kết không xóa người; cặp ly hôn/đã mất vẽ nét đứt; tối đa 2 cha/mẹ + chặn vòng lặp tổ tiên thực thi bằng trigger Postgres. Chưa click-test bằng trình duyệt thật (xem `docs/plan.md` mục M3) — cần thử tay trước khi dùng thật.
+**Trạng thái:** M0–M2 xong — đăng nhập Google, CRUD thành viên (thêm/sửa/xóa + undo 10s), ảnh đại diện (crop vuông, Storage), tự lưu, hiển thị cây (pan/zoom, fit toàn cây, về gốc). M3 (quan hệ) đã code xong — mỗi node có nút nhanh +Cha/Mẹ, +Vợ/Chồng, +Con; xóa liên kết không xóa người; cặp ly hôn/đã mất vẽ nét đứt; tối đa 2 cha/mẹ + chặn vòng lặp tổ tiên thực thi bằng trigger Postgres. M4 đã code xong — click node mở panel chi tiết (ảnh, thông tin, cha mẹ/vợ chồng/con click nhảy tới được); thu gọn/mở rộng nhánh (badge số người đang ẩn); "Xem cây từ người này" (pan/zoom camera tới người đó, không ẩn nhánh nào — đổi hướng sau khi phát hiện đổi rootId của thuật toán làm mất cả cô/chú/bác của người được chọn); tìm theo tên không phân biệt dấu. Chưa click-test bằng trình duyệt thật (xem `docs/plan.md` mục M3, M4) — cần thử tay trước khi dùng thật.
 
 Vite + React + TS + Tailwind, backend là Supabase (Postgres + Auth + Storage + RLS).
 
