@@ -127,6 +127,23 @@ export function spousesOf(personId: string, people: Person[], relationships: Rel
   })
 }
 
+// FR-3.3: toàn bộ người sẽ biến mất khỏi cây khi thu gọn nhánh dưới personId —
+// con/cháu... huyết thống (descendantsOf) CỘNG vợ/chồng của từng người đó (rể/
+// dâu married vào nhánh phải ẩn theo, không thì họ nổi lơ lửng không còn cha/
+// mẹ/con nào hiển thị cạnh mình). KHÔNG ẩn vợ/chồng của chính personId — cặp đó
+// vẫn là "gốc" của nhánh đang thu gọn, phải giữ lại để còn thấy nút mở lại.
+export function collapsedBranchIds(
+  personId: string,
+  people: Person[],
+  relationships: Relationship[],
+): Set<string> {
+  const hidden = descendantsOf(personId, relationships)
+  for (const id of [...hidden]) {
+    for (const { person } of spousesOf(id, people, relationships)) hidden.add(person.id)
+  }
+  return hidden
+}
+
 // FR-2.2 (cảnh báo, không chặn): lấy năm từ chuỗi ngày tự do kiểu '1920',
 // '~1920', '12/1920' — chỉ cần con số 4 chữ số đầu tiên, không parse ngày đầy đủ.
 function yearOf(date: string | null): number | null {
