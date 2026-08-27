@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { disableSharing, enableSharing, shareUrl } from '../lib/share'
 import type { Tree } from '../lib/supabase'
+import { useDialogA11y } from '../lib/useDialogA11y'
 
 // FR-5.1: bật/tắt/tạo lại link chia sẻ chỉ-xem. Modal này chỉ ghi cột
 // trees.share_token qua policy owner-update sẵn có (migration 0001) — không
@@ -18,6 +19,7 @@ export function ShareModal({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const dialogRef = useDialogA11y<HTMLDivElement>(onClose)
 
   const link = tree.share_token ? shareUrl(tree.share_token) : null
 
@@ -59,11 +61,16 @@ export function ShareModal({
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={onClose}>
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="share-modal-title"
+        tabIndex={-1}
         className="w-full max-w-md rounded-lg bg-white p-4 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-semibold text-stone-800">Chia sẻ cây</h2>
+          <h2 id="share-modal-title" className="font-semibold text-stone-800">Chia sẻ cây</h2>
           <button onClick={onClose} className="text-stone-400 hover:text-stone-700" aria-label="Đóng">
             ✕
           </button>
