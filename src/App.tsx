@@ -135,10 +135,13 @@ function Home({ session }: { session: Session }) {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center justify-between border-b border-stone-200 px-4 py-3">
+      {/* NFR mobile: flex-wrap — trên màn hẹp, nhóm phải (chia sẻ/email/đăng
+          xuất) tự xuống hàng dưới thay vì tràn ngang ra ngoài khung nhìn (email
+          dài + 3 nút + tên cây + 2 tab không bao giờ vừa 1 hàng trên điện thoại). */}
+      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-stone-200 px-4 py-3">
         <div className="flex items-center gap-4">
           <h1 className="font-semibold text-stone-800">{tree.name}</h1>
-          <nav className="flex gap-1 text-sm">
+          <nav aria-label="Chế độ xem" className="flex gap-1 text-sm">
             <TabButton active={tab === 'tree'} onClick={() => setTab('tree')}>
               Cây
             </TabButton>
@@ -155,7 +158,9 @@ function Home({ session }: { session: Session }) {
           >
             {tree.share_token ? 'Đang chia sẻ' : 'Chia sẻ'}
           </button>
-          <span>{session.user.email}</span>
+          {/* Email không phải thông tin thiết yếu để thao tác — ẩn trên màn rất
+              hẹp để nhường chỗ cho 2 nút hành động, hiện lại từ sm: trở lên. */}
+          <span className="hidden max-w-[180px] truncate sm:inline">{session.user.email}</span>
           <button
             onClick={() => supabase.auth.signOut()}
             className="rounded-md border border-stone-300 px-3 py-1.5 hover:bg-stone-50"
@@ -186,6 +191,7 @@ function TabButton({
   return (
     <button
       onClick={onClick}
+      aria-current={active ? 'page' : undefined}
       className={`rounded-md px-3 py-1.5 ${active ? 'bg-stone-800 text-white' : 'text-stone-600 hover:bg-stone-100'}`}
     >
       {children}

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import type { Gender, Person } from '../lib/people'
 import { createPerson } from '../lib/people'
+import { useDialogA11y } from '../lib/useDialogA11y'
 import {
   ancestorsOf,
   childrenOf,
@@ -54,6 +55,7 @@ export function RelationshipModal({
   onRelationshipDeleted: (id: string) => void
 }) {
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const dialogRef = useDialogA11y<HTMLDivElement>(onClose)
 
   const existing: RelatedPerson[] =
     kind === 'parent'
@@ -79,11 +81,16 @@ export function RelationshipModal({
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={onClose}>
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="relationship-modal-title"
+        tabIndex={-1}
         className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-white p-4 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-semibold text-stone-800">
+          <h2 id="relationship-modal-title" className="font-semibold text-stone-800">
             {KIND_LABEL[kind]} của {person.full_name}
           </h2>
           <button onClick={onClose} className="text-stone-400 hover:text-stone-700" aria-label="Đóng">

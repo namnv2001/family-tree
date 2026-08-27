@@ -117,6 +117,10 @@ export function TreeNode({
           type="button"
           onClick={onToggleCollapse}
           title={`Mở rộng nhánh — đang ẩn ${hiddenCount} người`}
+          // aria-label riêng: nút có text "+3" làm accessible name mặc định,
+          // không đủ nghĩa cho screen reader (title không tính vào accessible
+          // name khi đã có text con) — ghi đè bằng câu đầy đủ như tooltip.
+          aria-label={`Mở rộng nhánh — đang ẩn ${hiddenCount} người`}
           className="absolute -bottom-2 left-1/2 z-10 -translate-x-1/2 translate-y-1/2 rounded-full border border-amber-400 bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium leading-none text-amber-700 shadow-sm hover:bg-amber-200"
         >
           +{hiddenCount}
