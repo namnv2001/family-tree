@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { NewPerson, Person } from '../lib/people'
 import { countRelationships, createPerson, deletePerson, listPeople, matchesName } from '../lib/people'
 import { childrenOf, createRelationship, listRelationships, parentsOf, spousesOf, type Relationship } from '../lib/relationships'
-import { PersonForm } from './PersonForm'
+import { PersonForm, type NewPersonLinks } from './PersonForm'
 import { PersonRow } from './PersonRow'
 import { RelationshipModal, type RelationshipKind } from './RelationshipModal'
 
@@ -45,11 +45,15 @@ export function PeoplePage() {
 
   const visible = people.filter((p) => !pending.current.has(p.id) && (!query.trim() || matchesName(p, query)))
 
-  async function handleAdd(input: NewPerson, parentIds: string[]) {
+  async function handleAdd(input: NewPerson, { parentIds, spouse }: NewPersonLinks) {
     const created = await createPerson(input)
     setPeople((prev) => [...(prev ?? []), created]) // FR-1.1: node xuất hiện ngay, không reload
     for (const parentId of parentIds) {
       const rel = await createRelationship({ type: 'parent_of', from_id: parentId, to_id: created.id })
+      setRelationships((prev) => [...prev, rel])
+    }
+    if (spouse) {
+      const rel = await createRelationship({ type: 'spouse_of', from_id: created.id, to_id: spouse.id, status: spouse.status })
       setRelationships((prev) => [...prev, rel])
     }
   }

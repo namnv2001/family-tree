@@ -16,6 +16,7 @@ import {
   type RelatedPerson,
   type Relationship,
   type SpouseStatus,
+  STATUS_LABEL,
 } from '../lib/relationships'
 
 export type RelationshipKind = 'parent' | 'spouse' | 'child'
@@ -24,12 +25,6 @@ const KIND_LABEL: Record<RelationshipKind, string> = {
   parent: 'Cha/Mẹ',
   spouse: 'Vợ/Chồng',
   child: 'Con',
-}
-
-const STATUS_LABEL: Record<SpouseStatus, string> = {
-  married: 'Đang kết hôn',
-  divorced: 'Đã ly hôn',
-  widowed: 'Đã mất',
 }
 
 export function RelationshipModal({

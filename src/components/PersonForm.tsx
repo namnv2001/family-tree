@@ -1,7 +1,9 @@
 import { useRef, useState, type FormEvent, type ReactNode } from 'react'
 import type { Gender, NewPerson, Person } from '../lib/people'
-import { spousesOf, type Relationship } from '../lib/relationships'
+import { spousesOf, STATUS_LABEL, type Relationship, type SpouseStatus } from '../lib/relationships'
 import { PersonCombobox } from './PersonCombobox'
+
+export type NewPersonLinks = { parentIds: string[]; spouse: { id: string; status: SpouseStatus } | null }
 
 export function PersonForm({
   people,
@@ -10,11 +12,13 @@ export function PersonForm({
 }: {
   people: Person[]
   relationships: Relationship[]
-  onAdd: (input: NewPerson, parentIds: string[]) => Promise<void>
+  onAdd: (input: NewPerson, links: NewPersonLinks) => Promise<void>
 }) {
   const [fullName, setFullName] = useState('')
   const [parentId, setParentId] = useState('')
   const [coParentId, setCoParentId] = useState('')
+  const [spouseId, setSpouseId] = useState('')
+  const [spouseStatus, setSpouseStatus] = useState<SpouseStatus>('married')
   const [gender, setGender] = useState<Gender>('male')
   const [birthDate, setBirthDate] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -31,10 +35,18 @@ export function PersonForm({
     setBusy(true)
     setError(null)
     try {
-      await onAdd({ full_name: name, gender, birth_date: birthDate.trim() || null }, [parentId, coParentId].filter(Boolean))
+      await onAdd(
+        { full_name: name, gender, birth_date: birthDate.trim() || null },
+        {
+          parentIds: [parentId, coParentId].filter(Boolean),
+          spouse: spouseId ? { id: spouseId, status: spouseStatus } : null,
+        },
+      )
       setFullName('')
       setGender('male')
       setBirthDate('')
+      setSpouseId('')
+      setSpouseStatus('married')
       // Giữ nguyên cha/mẹ đã chọn: thường nhập liền một lượt cả nhà anh chị em.
       nameRef.current?.focus()
     } catch (err) {
@@ -107,6 +119,33 @@ export function PersonForm({
             {spouses.map(({ person: s }) => (
               <option key={s.id} value={s.id}>
                 {s.full_name}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
+      {people.length > 0 && (
+        <Field label="Vợ/Chồng của">
+          <PersonCombobox
+            people={people.filter((p) => p.id !== parentId && p.id !== coParentId)}
+            selectedId={spouseId}
+            onSelect={(p) => setSpouseId(p?.id ?? '')}
+            placeholder="Gõ tên vợ/chồng…"
+            label="Vợ/Chồng của"
+            className="w-56"
+          />
+        </Field>
+      )}
+      {spouseId && (
+        <Field label="Tình trạng">
+          <select
+            value={spouseStatus}
+            onChange={(e) => setSpouseStatus(e.target.value as SpouseStatus)}
+            className="rounded-md border border-stone-300 px-2 py-1.5"
+          >
+            {(Object.keys(STATUS_LABEL) as SpouseStatus[]).map((s) => (
+              <option key={s} value={s}>
+                {STATUS_LABEL[s]}
               </option>
             ))}
           </select>

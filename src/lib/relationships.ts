@@ -4,6 +4,12 @@ import { loadTree, mutate } from './store'
 export type RelationshipType = 'parent_of' | 'spouse_of'
 export type SpouseStatus = 'married' | 'divorced' | 'widowed'
 
+export const STATUS_LABEL: Record<SpouseStatus, string> = {
+  married: 'Đang kết hôn',
+  divorced: 'Đã ly hôn',
+  widowed: 'Đã mất',
+}
+
 export type Relationship = {
   id: string
   type: RelationshipType
