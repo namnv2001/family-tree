@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useRef, useState, type FormEvent, type ReactNode } from 'react'
 import type { Gender, NewPerson } from '../lib/people'
 
 export function PersonForm({ onAdd }: { onAdd: (input: NewPerson) => Promise<void> }) {
@@ -7,6 +7,7 @@ export function PersonForm({ onAdd }: { onAdd: (input: NewPerson) => Promise<voi
   const [birthDate, setBirthDate] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const nameRef = useRef<HTMLInputElement>(null)
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -22,6 +23,7 @@ export function PersonForm({ onAdd }: { onAdd: (input: NewPerson) => Promise<voi
       setFullName('')
       setGender('male')
       setBirthDate('')
+      nameRef.current?.focus()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Thêm thất bại.')
     } finally {
@@ -36,6 +38,7 @@ export function PersonForm({ onAdd }: { onAdd: (input: NewPerson) => Promise<voi
     >
       <Field label="Họ tên *">
         <input
+          ref={nameRef}
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
           placeholder="Nguyễn Văn A"

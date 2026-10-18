@@ -5,3 +5,13 @@ body,
 #root {
   height: 100%;
 }
+
+/* Toàn bộ màu viết cho nền sáng — không khoá thì trình duyệt ở dark mode tô nền tối, chữ stone-800 gần như biến mất. */
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: #fff;
+  color: var(--color-stone-800);
+}

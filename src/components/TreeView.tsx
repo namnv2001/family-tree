@@ -164,8 +164,7 @@ export function TreeView() {
     if (layout?.primaryRootId) focusPerson(layout.primaryRootId)
   }
 
-  function handleFit() {
-    const ref = transformRef.current
+  function handleFit(ref = transformRef.current) {
     const wrapper = ref?.instance.wrapperComponent
     const content = ref?.instance.contentComponent
     if (!ref || !wrapper || !content) return
@@ -221,7 +220,7 @@ export function TreeView() {
           Về gốc
         </button>
         <button
-          onClick={handleFit}
+          onClick={() => handleFit()}
           disabled={layout.nodes.length === 0}
           className="rounded-md border border-stone-300 px-3 py-1.5 text-sm hover:bg-stone-50 disabled:opacity-50"
         >
@@ -259,7 +258,7 @@ export function TreeView() {
             minScale={0.15}
             maxScale={2}
             limitToBounds={false}
-            centerOnInit
+            onInit={(ref) => handleFit(ref)}
             // Mặc định `smooth: true` của lib nhân bước zoom với deltaY THÔ của
             // sự kiện lăn chuột — chuột thường trên Windows bắn deltaY ~100/nấc,
             // bước zoom thành 0.015*100=1.5 (lớn hơn cả khoảng minScale-maxScale),
@@ -337,9 +336,12 @@ export function TreeView() {
                       hiddenCount={hiddenCountByNode.get(n.id) ?? 0}
                       onSelect={() => setSelectedPersonId(n.id)}
                       onToggleCollapse={() => toggleCollapse(n.id)}
-                      onAddParent={readOnly ? undefined : () => setModal({ person: n, kind: 'parent' })}
-                      onAddSpouse={readOnly ? undefined : () => setModal({ person: n, kind: 'spouse' })}
-                      onAddChild={readOnly ? undefined : () => setModal({ person: n, kind: 'child' })}
+                      {...(!readOnly &&
+                        selectedPersonId === n.id && {
+                          onAddParent: () => setModal({ person: n, kind: 'parent' }),
+                          onAddSpouse: () => setModal({ person: n, kind: 'spouse' }),
+                          onAddChild: () => setModal({ person: n, kind: 'child' }),
+                        })}
                     />
                   </div>
                 ))}
