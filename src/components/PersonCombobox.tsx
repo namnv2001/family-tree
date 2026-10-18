@@ -1,37 +1,67 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import { matchesName, type Person } from '../lib/people'
 
-// FR-4.1: gõ tên (không phân biệt dấu) → chọn kết quả → cây pan/zoom tới node
-// (xử lý ở TreeView qua onSelect, component này chỉ lo lọc + hiển thị dropdown).
-const MAX_RESULTS = 8
-
-const LISTBOX_ID = 'tree-search-listbox'
-
-export function TreeSearch({
+// Ô gõ-để-lọc theo tên (không phân biệt dấu), 2 kiểu dùng:
+// - Tìm (không truyền selectedId): gõ mới hiện kết quả, chọn xong gọi onSelect.
+// - Chọn người (có selectedId): thay cho <select> — focus là hiện cả danh sách,
+//   ô hiển thị tên người đang chọn, xoá trắng rồi rời ô là bỏ chọn.
+export function PersonCombobox({
   people,
   onSelect,
+  selectedId,
+  placeholder = 'Tìm theo tên…',
+  label = 'Tìm theo tên',
+  className = 'w-48',
 }: {
   people: Person[]
-  onSelect: (person: Person) => void
+  onSelect: (person: Person | null) => void
+  selectedId?: string
+  placeholder?: string
+  label?: string
+  className?: string
 }) {
-  const [query, setQuery] = useState('')
+  const isPicker = selectedId !== undefined
+  const selectedName = people.find((p) => p.id === selectedId)?.full_name ?? ''
+  const [query, setQuery] = useState(selectedName)
   const [open, setOpen] = useState(false)
   // NFR a11y: chỉ số kết quả đang chọn bằng bàn phím (mũi tên lên/xuống) —
   // KHÔNG dùng focus DOM thật (theo mẫu combobox chuẩn: focus vẫn ở input,
   // "đang chọn" chỉ báo qua aria-activedescendant + tô nền), nên input không
   // bao giờ mất focus khi rê chuột/di chuyển bằng phím.
   const [activeIndex, setActiveIndex] = useState(-1)
+  const idPrefix = useId()
+  const listboxId = `${idPrefix}-listbox`
+
+  // Form cha đổi lựa chọn từ bên ngoài (vd: reset sau khi thêm) → ô hiện theo.
+  useEffect(() => {
+    if (isPicker) setQuery(selectedName)
+  }, [isPicker, selectedName])
 
   const results = useMemo(() => {
-    if (!query.trim()) return []
-    return people.filter((p) => matchesName(p, query)).slice(0, MAX_RESULTS)
-  }, [people, query])
+    const q = query.trim()
+    if (!q || (isPicker && q === selectedName)) {
+      return isPicker ? [...people].sort((a, b) => a.full_name.localeCompare(b.full_name, 'vi')) : []
+    }
+    const matches = people.filter((p) => matchesName(p, q))
+    return isPicker ? matches : matches.slice(0, 8)
+  }, [people, query, isPicker, selectedName])
 
   function pick(person: Person) {
     onSelect(person)
     setQuery(person.full_name)
     setOpen(false)
     setActiveIndex(-1)
+  }
+
+  function handleBlur() {
+    setOpen(false)
+    setActiveIndex(-1)
+    if (!isPicker) return
+    if (!query.trim()) {
+      if (selectedId) onSelect(null)
+    } else {
+      setQuery(selectedName)
+    }
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -46,24 +76,26 @@ export function TreeSearch({
       setOpen(true)
       setActiveIndex((i) => (i <= 0 ? results.length - 1 : i - 1))
     } else if (e.key === 'Enter') {
-      const chosen = activeIndex >= 0 ? results[activeIndex] : results[0]
+      const chosen = activeIndex >= 0 ? results[activeIndex] : open ? results[0] : undefined
       if (chosen) {
         e.preventDefault()
         pick(chosen)
       }
     } else if (e.key === 'Escape') {
       if (open) {
+        // Chỉ đóng dropdown — không để Escape lan lên làm đóng luôn modal chứa ô này.
         e.preventDefault()
+        e.stopPropagation()
         setOpen(false)
         setActiveIndex(-1)
       }
     }
   }
 
-  const activeId = activeIndex >= 0 ? `tree-search-option-${results[activeIndex]!.id}` : undefined
+  const activeId = activeIndex >= 0 ? `${idPrefix}-option-${results[activeIndex]!.id}` : undefined
 
   return (
-    <div className="relative">
+    <div className={`relative ${className}`}>
       <input
         value={query}
         onChange={(e) => {
@@ -71,23 +103,26 @@ export function TreeSearch({
           setOpen(true)
           setActiveIndex(-1)
         }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
+        onFocus={(e) => {
+          setOpen(true)
+          if (isPicker) e.target.select()
+        }}
+        onBlur={handleBlur}
         onKeyDown={handleKeyDown}
-        placeholder="Tìm theo tên…"
-        aria-label="Tìm theo tên"
+        placeholder={placeholder}
+        aria-label={label}
         role="combobox"
         aria-expanded={open && results.length > 0}
-        aria-controls={LISTBOX_ID}
+        aria-controls={listboxId}
         aria-autocomplete="list"
         aria-activedescendant={activeId}
-        className="w-48 rounded-md border border-stone-300 px-2.5 py-1.5 text-sm"
+        className="w-full rounded-md border border-stone-300 px-2.5 py-1.5 text-sm"
       />
       {open && results.length > 0 && (
         <ul
-          id={LISTBOX_ID}
+          id={listboxId}
           role="listbox"
-          className="absolute right-0 z-20 mt-1 w-64 rounded-md border border-stone-200 bg-white py-1 text-sm shadow-lg"
+          className={`absolute ${isPicker ? 'left-0' : 'right-0'} z-20 mt-1 max-h-64 w-full min-w-64 overflow-y-auto rounded-md border border-stone-200 bg-white py-1 text-sm shadow-lg`}
         >
           {results.map((p, i) => (
             // Không dùng <button>: theo mẫu combobox chuẩn, các option không tự
@@ -97,7 +132,7 @@ export function TreeSearch({
             // mất focus trước khi bấm đăng ký, khỏi cần race-condition timeout hack.
             <li
               key={p.id}
-              id={`tree-search-option-${p.id}`}
+              id={`${idPrefix}-option-${p.id}`}
               role="option"
               aria-selected={i === activeIndex}
               onMouseDown={(e) => {
@@ -107,9 +142,10 @@ export function TreeSearch({
               onMouseEnter={() => setActiveIndex(i)}
               className={`block w-full cursor-pointer truncate px-3 py-1.5 ${
                 i === activeIndex ? 'bg-stone-100' : 'hover:bg-stone-50'
-              }`}
+              } ${p.id === selectedId ? 'font-medium' : ''}`}
             >
               {p.full_name}
+              {isPicker && p.birth_date && <span className="ml-1 text-stone-400">({p.birth_date})</span>}
             </li>
           ))}
         </ul>

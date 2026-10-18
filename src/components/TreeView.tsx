@@ -12,7 +12,7 @@ import { buildTreeLayout } from '../lib/treeLayout'
 import { PersonPanel } from './PersonPanel'
 import { RelationshipModal, type RelationshipKind } from './RelationshipModal'
 import { CARD_INSET, NODE_HEIGHT, NODE_WIDTH, TreeNode } from './TreeNode'
-import { TreeSearch } from './TreeSearch'
+import { PersonCombobox } from './PersonCombobox'
 
 // relatives-tree đặt mỗi node cách nhau đúng 2 đơn vị lưới theo cả 2 chiều
 // (SIZE trong constants.ts của lib) — nên 1 đơn vị lưới = nửa kích thước node.
@@ -243,7 +243,7 @@ export function TreeView() {
         </button>
         {exportError && <span className="text-sm text-red-600">{exportError}</span>}
         <div className="ml-auto">
-          <TreeSearch people={people ?? []} onSelect={handleJumpTo} />
+          <PersonCombobox people={people ?? []} onSelect={(p) => p && handleJumpTo(p)} />
         </div>
       </div>
 
@@ -374,6 +374,10 @@ export function TreeView() {
           relationships={relationships}
           onClose={() => setModal(null)}
           onPersonCreated={(p) => setPeople((prev) => [...(prev ?? []), p])}
+          onPeopleUpdated={(updated) => {
+            const byId = new Map(updated.map((p) => [p.id, p]))
+            setPeople((prev) => prev?.map((p) => byId.get(p.id) ?? p) ?? prev)
+          }}
           onRelationshipCreated={(r) => setRelationships((prev) => [...(prev ?? []), r])}
           onRelationshipChanged={(r) =>
             setRelationships((prev) => prev?.map((x) => (x.id === r.id ? r : x)) ?? prev)

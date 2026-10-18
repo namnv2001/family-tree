@@ -4,6 +4,9 @@ import { formatLifespan, updatePerson } from '../lib/people'
 import { AutosaveSkip, useAutosave, type SaveStatus } from '../lib/useAutosave'
 import { Avatar } from './Avatar'
 import { PhotoField } from './PhotoField'
+import type { RelationshipKind } from './RelationshipModal'
+
+const RELATION_LABEL: Record<RelationshipKind, string> = { parent: 'Cha/Mẹ', spouse: 'Vợ/Chồng', child: 'Con' }
 
 type Draft = Pick<
   Person,
@@ -24,10 +27,14 @@ function toDraft(p: Person): Draft {
 
 export function PersonRow({
   person,
+  relations,
+  onEditRelations,
   onChanged,
   onDelete,
 }: {
   person: Person
+  relations: Record<RelationshipKind, string[]>
+  onEditRelations: (kind: RelationshipKind) => void
   onChanged: (p: Person) => void
   onDelete: () => void
 }) {
@@ -130,6 +137,26 @@ export function PersonRow({
               className="rounded-md border border-stone-300 px-2 py-1.5"
             />
           </label>
+
+          <div className="flex flex-col gap-1 text-sm text-stone-600 sm:col-span-2">
+            Quan hệ
+            <div className="flex flex-col divide-y divide-stone-200 rounded-md border border-stone-300">
+              {(Object.keys(RELATION_LABEL) as RelationshipKind[]).map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  onClick={() => onEditRelations(kind)}
+                  className="flex items-center gap-2 px-3 py-2 text-left hover:bg-stone-50"
+                >
+                  <span className="w-20 shrink-0 text-stone-500">{RELATION_LABEL[kind]}</span>
+                  <span className={`min-w-0 flex-1 truncate ${relations[kind].length ? 'text-stone-800' : 'text-stone-400'}`}>
+                    {relations[kind].join(', ') || 'Chưa có'}
+                  </span>
+                  <span className="shrink-0 text-stone-500">{relations[kind].length ? 'Sửa' : '+ Thêm'}</span>
+                </button>
+              ))}
+            </div>
+          </div>
 
           <div className="sm:col-span-2">
             <PhotoField person={person} onChanged={onChanged} />

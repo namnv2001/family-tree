@@ -1,4 +1,4 @@
-import type { Person } from './people'
+import { compareSiblings, type Person } from './people'
 import { loadTree, mutate } from './store'
 
 export type RelationshipType = 'parent_of' | 'spouse_of'
@@ -93,7 +93,7 @@ export function parentsOf(personId: string, people: Person[], relationships: Rel
 export function childrenOf(personId: string, people: Person[], relationships: Relationship[]): RelatedPerson[] {
   return relatedBy(people, relationships, (r) =>
     r.type === 'parent_of' && r.from_id === personId ? r.to_id : null,
-  )
+  ).sort((a, b) => compareSiblings(a.person, b.person))
 }
 
 // BFS ngược theo parent_of để lấy mọi tổ tiên (cha/mẹ, ông/bà, ...) của personId.

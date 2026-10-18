@@ -64,6 +64,27 @@ export async function deletePerson(id: string): Promise<void> {
   if (photo) await deletePersonPhoto(photo)
 }
 
+// Lưu thứ tự anh chị em theo đúng thứ tự mảng ids (lớn → nhỏ), một lần ghi.
+export async function setSiblingOrder(ids: string[]): Promise<void> {
+  await mutate((d) => {
+    d.people = d.people.map((p) => (ids.includes(p.id) ? { ...p, sibling_order: ids.indexOf(p.id) + 1 } : p))
+  })
+}
+
+// Thứ tự xếp tay (sibling_order) thắng năm sinh: gia phả hay thiếu năm sinh của
+// vài người, so năm trước thì những người thiếu năm không xếp được. Chưa xếp tay
+// (cùng 0) thì mới theo năm sinh, lớn tuổi trước.
+export function compareSiblings(
+  a: Pick<Person, 'sibling_order' | 'birth_date'>,
+  b: Pick<Person, 'sibling_order' | 'birth_date'>,
+): number {
+  if (a.sibling_order !== b.sibling_order) return a.sibling_order - b.sibling_order
+  const ay = a.birth_date?.match(/\d{4}/)?.[0]
+  const by = b.birth_date?.match(/\d{4}/)?.[0]
+  if (ay && by) return Number(ay) - Number(by)
+  return ay ? -1 : by ? 1 : 0
+}
+
 // FR-1.2: phải cảnh báo rõ trước khi xóa người còn quan hệ (cha/mẹ, vợ/chồng, con).
 export async function countRelationships(personId: string): Promise<number> {
   const { relationships } = await loadTree()

@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import type { Gender, Person } from '../lib/people'
-import { createPerson } from '../lib/people'
+import { createPerson, setSiblingOrder } from '../lib/people'
 import { useDialogA11y } from '../lib/useDialogA11y'
+import { PersonCombobox } from './PersonCombobox'
 import {
   ancestorsOf,
   childrenOf,
@@ -38,6 +39,7 @@ export function RelationshipModal({
   relationships,
   onClose,
   onPersonCreated,
+  onPeopleUpdated,
   onRelationshipCreated,
   onRelationshipChanged,
   onRelationshipDeleted,
@@ -48,6 +50,7 @@ export function RelationshipModal({
   relationships: Relationship[]
   onClose: () => void
   onPersonCreated: (p: Person) => void
+  onPeopleUpdated: (updated: Person[]) => void
   onRelationshipCreated: (r: Relationship) => void
   onRelationshipChanged: (r: Relationship) => void
   onRelationshipDeleted: (id: string) => void
@@ -76,6 +79,21 @@ export function RelationshipModal({
     }
   }
 
+  async function moveChild(index: number, delta: -1 | 1) {
+    const ordered = existing.map(({ person: p }) => p)
+    const [moved] = ordered.splice(index, 1)
+    ordered.splice(index + delta, 0, moved!)
+    setDeleteError(null)
+    try {
+      await setSiblingOrder(ordered.map((p) => p.id))
+      onPeopleUpdated(ordered.map((p, i) => ({ ...p, sibling_order: i + 1 })))
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Đổi thứ tự thất bại.')
+    }
+  }
+
+  const canReorder = kind === 'child' && existing.length > 1
+
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={onClose}>
       <div
@@ -96,14 +114,40 @@ export function RelationshipModal({
           </button>
         </div>
 
+        {canReorder && (
+          <p className="mb-2 text-xs text-stone-500">Xếp từ con cả đến con út — dùng khi không đủ năm sinh.</p>
+        )}
         {existing.length > 0 && (
           <ul className="mb-4 flex flex-col gap-1.5">
-            {existing.map(({ rel, person: other }) => (
+            {existing.map(({ rel, person: other }, i) => (
               <li
                 key={rel.id}
                 className="flex items-center justify-between rounded-md border border-stone-200 px-2.5 py-1.5 text-sm"
               >
                 <span className="flex items-center gap-1.5">
+                  {canReorder && (
+                    <span className="flex">
+                      <button
+                        type="button"
+                        onClick={() => moveChild(i, -1)}
+                        disabled={i === 0}
+                        aria-label={`Đưa ${other.full_name} lên trên`}
+                        className="rounded px-1.5 text-stone-500 hover:bg-stone-100 disabled:opacity-30"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveChild(i, 1)}
+                        disabled={i === existing.length - 1}
+                        aria-label={`Đưa ${other.full_name} xuống dưới`}
+                        className="rounded px-1.5 text-stone-500 hover:bg-stone-100 disabled:opacity-30"
+                      >
+                        ↓
+                      </button>
+                    </span>
+                  )}
+                  {canReorder && <span className="w-4 text-xs text-stone-400">{i + 1}.</span>}
                   {other.full_name}
                   {rel.type === 'spouse_of' && rel.status && (
                     <SpouseStatusSelect rel={rel} onChanged={onRelationshipChanged} />
@@ -296,18 +340,14 @@ function AddForm({
         candidates.length === 0 ? (
           <p className="text-sm text-stone-400">Không có người phù hợp trong cây — hãy tạo người mới.</p>
         ) : (
-          <select
-            value={existingId}
-            onChange={(e) => setExistingId(e.target.value)}
-            className="rounded-md border border-stone-300 px-2 py-1.5 text-sm"
-          >
-            <option value="">— Chọn người —</option>
-            {candidates.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.full_name}
-              </option>
-            ))}
-          </select>
+          <PersonCombobox
+            people={candidates}
+            selectedId={existingId}
+            onSelect={(p) => setExistingId(p?.id ?? '')}
+            placeholder="Gõ tên để chọn người…"
+            label="Chọn người"
+            className="w-full"
+          />
         )
       ) : (
         <div className="flex gap-2">

@@ -1,8 +1,20 @@
 import { useRef, useState, type FormEvent, type ReactNode } from 'react'
-import type { Gender, NewPerson } from '../lib/people'
+import type { Gender, NewPerson, Person } from '../lib/people'
+import { spousesOf, type Relationship } from '../lib/relationships'
+import { PersonCombobox } from './PersonCombobox'
 
-export function PersonForm({ onAdd }: { onAdd: (input: NewPerson) => Promise<void> }) {
+export function PersonForm({
+  people,
+  relationships,
+  onAdd,
+}: {
+  people: Person[]
+  relationships: Relationship[]
+  onAdd: (input: NewPerson, parentIds: string[]) => Promise<void>
+}) {
   const [fullName, setFullName] = useState('')
+  const [parentId, setParentId] = useState('')
+  const [coParentId, setCoParentId] = useState('')
   const [gender, setGender] = useState<Gender>('male')
   const [birthDate, setBirthDate] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -19,16 +31,25 @@ export function PersonForm({ onAdd }: { onAdd: (input: NewPerson) => Promise<voi
     setBusy(true)
     setError(null)
     try {
-      await onAdd({ full_name: name, gender, birth_date: birthDate.trim() || null })
+      await onAdd({ full_name: name, gender, birth_date: birthDate.trim() || null }, [parentId, coParentId].filter(Boolean))
       setFullName('')
       setGender('male')
       setBirthDate('')
+      // Giữ nguyên cha/mẹ đã chọn: thường nhập liền một lượt cả nhà anh chị em.
       nameRef.current?.focus()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Thêm thất bại.')
     } finally {
       setBusy(false)
     }
+  }
+
+  const spouses = parentId ? spousesOf(parentId, people, relationships) : []
+
+  function chooseParent(id: string) {
+    setParentId(id)
+    const options = id ? spousesOf(id, people, relationships) : []
+    setCoParentId(options.length === 1 ? options[0]!.person.id : '')
   }
 
   return (
@@ -63,6 +84,34 @@ export function PersonForm({ onAdd }: { onAdd: (input: NewPerson) => Promise<voi
           className="w-44 rounded-md border border-stone-300 px-2 py-1.5"
         />
       </Field>
+      {people.length > 0 && (
+        <Field label="Con của">
+          <PersonCombobox
+            people={people}
+            selectedId={parentId}
+            onSelect={(p) => chooseParent(p?.id ?? '')}
+            placeholder="Gõ tên cha/mẹ…"
+            label="Con của"
+            className="w-56"
+          />
+        </Field>
+      )}
+      {spouses.length > 0 && (
+        <Field label="và">
+          <select
+            value={coParentId}
+            onChange={(e) => setCoParentId(e.target.value)}
+            className="max-w-56 rounded-md border border-stone-300 px-2 py-1.5"
+          >
+            <option value="">— Chỉ một cha/mẹ —</option>
+            {spouses.map(({ person: s }) => (
+              <option key={s.id} value={s.id}>
+                {s.full_name}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
       <button
         type="submit"
         disabled={busy}
