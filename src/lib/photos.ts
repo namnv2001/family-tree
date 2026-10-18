@@ -1,6 +1,5 @@
-import { supabase } from './supabase'
+import { saveFile } from './store'
 
-const BUCKET = 'photos'
 const MAX_BYTES = 5 * 1024 * 1024
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const SQUARE_SIZE = 512
@@ -15,7 +14,7 @@ function assertValidPhoto(file: File): void {
   }
 }
 
-// Center-crop về hình vuông trước khi upload — luôn ghi lại thành webp, nên
+// Center-crop về hình vuông trước khi lưu — luôn ghi lại thành webp, nên
 // đuôi file lưu trong photo_path luôn nhất quán bất kể ảnh gốc là loại gì.
 async function cropToSquare(file: File, size = SQUARE_SIZE): Promise<Blob> {
   const bitmap = await createImageBitmap(file)
@@ -39,30 +38,20 @@ async function cropToSquare(file: File, size = SQUARE_SIZE): Promise<Blob> {
   )
 }
 
-export async function uploadPersonPhoto(
-  treeId: string,
-  personId: string,
-  file: File,
-): Promise<string> {
+// Tên file mới mỗi lần upload: GitHub Pages cache ảnh theo URL, ghi đè cùng tên
+// thì người xem vẫn thấy ảnh cũ tới khi cache hết hạn.
+export async function uploadPersonPhoto(personId: string, file: File): Promise<string> {
   assertValidPhoto(file)
   const square = await cropToSquare(file)
-  const path = `${treeId}/${personId}.webp`
-  const { error } = await supabase.storage
-    .from(BUCKET)
-    .upload(path, square, { contentType: 'image/webp', upsert: true })
-  if (error) throw error
+  const path = `photos/${personId}-${Date.now()}.webp`
+  await saveFile(path, square)
   return path
 }
 
 export async function deletePersonPhoto(path: string): Promise<void> {
-  const { error } = await supabase.storage.from(BUCKET).remove([path])
-  if (error) throw error
+  await saveFile(path, null, 'DELETE')
 }
 
-// Bucket private (ảnh người còn sống là dữ liệu cá nhân, NFR riêng tư) — luôn
-// đọc qua signed URL, không public URL. Trả null nếu lỗi để UI rơi về avatar chữ cái.
-export async function getPhotoUrl(path: string): Promise<string | null> {
-  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 60 * 60)
-  if (error) return null
-  return data.signedUrl
+export function photoUrl(path: string): string {
+  return `${import.meta.env.BASE_URL}${path}`
 }

@@ -1,16 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
 import type { NewPerson, Person } from '../lib/people'
-import { countRelationships, createPerson, deletePerson, listPeople } from '../lib/people'
-import { PersonForm } from './PersonForm'
+import { countRelationships, createPerson, deletePerson, listPeople, matchesName } from '../lib/people'
+import { childrenOf, createRelationship, listRelationships, parentsOf, spousesOf, type Relationship } from '../lib/relationships'
+import { PersonForm, type NewPersonLinks } from './PersonForm'
 import { PersonRow } from './PersonRow'
+import { RelationshipModal, type RelationshipKind } from './RelationshipModal'
 
 const UNDO_MS = 10_000 // FR-1.2: undo trong 10 giây
 
 type PendingDelete = { person: Person; timer: ReturnType<typeof setTimeout> }
 
-export function PeoplePage({ treeId }: { treeId: string }) {
+export function PeoplePage() {
   const [people, setPeople] = useState<Person[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
+  const [relationships, setRelationships] = useState<Relationship[]>([])
+  const [modal, setModal] = useState<{ person: Person; kind: RelationshipKind } | null>(null)
 
   // Map giữ ở ref (nguồn sự thật, không async-stale); pendingIds ở state chỉ để
   // ép re-render khi map đổi — đọc map trong lúc render vẫn luôn là bản mới nhất.
@@ -18,10 +23,13 @@ export function PeoplePage({ treeId }: { treeId: string }) {
   const [pendingIds, setPendingIds] = useState<string[]>([])
 
   useEffect(() => {
-    listPeople(treeId)
-      .then(setPeople)
+    Promise.all([listPeople(), listRelationships()])
+      .then(([p, r]) => {
+        setPeople(p)
+        setRelationships(r)
+      })
       .catch((err) => setError(err instanceof Error ? err.message : 'Không tải được danh sách.'))
-  }, [treeId])
+  }, [])
 
   useEffect(() => {
     // Rời trang giữa lúc đang chờ undo: hủy hẹn giờ, đừng xóa "ma" sau khi unmount.
@@ -35,11 +43,19 @@ export function PeoplePage({ treeId }: { treeId: string }) {
   if (error) return <p className="p-4 text-red-600">{error}</p>
   if (!people) return <p className="p-4 text-stone-400">Đang tải…</p>
 
-  const visible = people.filter((p) => !pending.current.has(p.id))
+  const visible = people.filter((p) => !pending.current.has(p.id) && (!query.trim() || matchesName(p, query)))
 
-  async function handleAdd(input: NewPerson) {
-    const created = await createPerson(treeId, input)
+  async function handleAdd(input: NewPerson, { parentIds, spouse }: NewPersonLinks) {
+    const created = await createPerson(input)
     setPeople((prev) => [...(prev ?? []), created]) // FR-1.1: node xuất hiện ngay, không reload
+    for (const parentId of parentIds) {
+      const rel = await createRelationship({ type: 'parent_of', from_id: parentId, to_id: created.id })
+      setRelationships((prev) => [...prev, rel])
+    }
+    if (spouse) {
+      const rel = await createRelationship({ type: 'spouse_of', from_id: created.id, to_id: spouse.id, status: spouse.status })
+      setRelationships((prev) => [...prev, rel])
+    }
   }
 
   function handleChanged(updated: Person) {
@@ -82,52 +98,91 @@ export function PeoplePage({ treeId }: { treeId: string }) {
     try {
       await deletePerson(id)
       setPeople((prev) => prev?.filter((p) => p.id !== id) ?? prev)
+      setRelationships((prev) => prev.filter((r) => r.from_id !== id && r.to_id !== id))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Xóa thất bại.')
     }
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
-      <PersonForm onAdd={handleAdd} />
+    <div className="flex-1 overflow-y-auto p-4">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+        <PersonForm people={people} relationships={relationships} onAdd={handleAdd} />
 
-      {visible.length === 0 && (
-        <p className="text-center text-stone-400">Chưa có thành viên nào. Thêm người đầu tiên ở trên.</p>
-      )}
+        {people.length > 0 && (
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={`Tìm trong ${people.length} người…`}
+            aria-label="Tìm theo tên"
+            className="rounded-md border border-stone-300 px-3 py-1.5 text-sm"
+          />
+        )}
 
-      <ul className="flex flex-col gap-2">
-        {visible.map((p) => (
-          <li key={p.id}>
-            <PersonRow
-              treeId={treeId}
-              person={p}
-              onChanged={handleChanged}
-              onDelete={() => handleDeleteClick(p)}
-            />
-          </li>
-        ))}
-      </ul>
+        {visible.length === 0 && (
+          <p className="text-center text-stone-400">
+            {query.trim() ? 'Không có ai khớp tên này.' : 'Chưa có thành viên nào. Thêm người đầu tiên ở trên.'}
+          </p>
+        )}
 
-      <div className="pointer-events-none fixed inset-x-0 bottom-4 flex flex-col items-center gap-2">
-        {pendingIds.map((id) => {
-          const entry = pending.current.get(id)
-          if (!entry) return null
-          return (
-            <div
-              key={id}
-              className="pointer-events-auto flex items-center gap-3 rounded-lg bg-stone-800 px-4 py-2 text-sm text-white shadow-lg"
-            >
-              <span>Đã xóa {entry.person.full_name}.</span>
-              <button
-                onClick={() => undoDelete(id)}
-                className="font-semibold text-amber-300 hover:text-amber-200"
+        <ul className="flex flex-col gap-2">
+          {visible.map((p) => (
+            <li key={p.id}>
+              <PersonRow
+                person={p}
+                relations={{
+                  parent: parentsOf(p.id, people, relationships).map((x) => x.person.full_name),
+                  spouse: spousesOf(p.id, people, relationships).map((x) => x.person.full_name),
+                  child: childrenOf(p.id, people, relationships).map((x) => x.person.full_name),
+                }}
+                onEditRelations={(kind) => setModal({ person: p, kind })}
+                onChanged={handleChanged}
+                onDelete={() => handleDeleteClick(p)}
+              />
+            </li>
+          ))}
+        </ul>
+
+        <div className="pointer-events-none fixed inset-x-0 bottom-4 flex flex-col items-center gap-2">
+          {pendingIds.map((id) => {
+            const entry = pending.current.get(id)
+            if (!entry) return null
+            return (
+              <div
+                key={id}
+                className="pointer-events-auto flex items-center gap-3 rounded-lg bg-stone-800 px-4 py-2 text-sm text-white shadow-lg"
               >
-                Hoàn tác
-              </button>
-            </div>
-          )
-        })}
+                <span>Đã xóa {entry.person.full_name}.</span>
+                <button
+                  onClick={() => undoDelete(id)}
+                  className="font-semibold text-amber-300 hover:text-amber-200"
+                >
+                  Hoàn tác
+                </button>
+              </div>
+            )
+          })}
+        </div>
       </div>
+
+      {modal && (
+        <RelationshipModal
+          person={modal.person}
+          kind={modal.kind}
+          people={people}
+          relationships={relationships}
+          onClose={() => setModal(null)}
+          onPersonCreated={(p) => setPeople((prev) => [...(prev ?? []), p])}
+          onPeopleUpdated={(updated) => {
+            const byId = new Map(updated.map((p) => [p.id, p]))
+            setPeople((prev) => prev?.map((p) => byId.get(p.id) ?? p) ?? prev)
+          }}
+          onRelationshipCreated={(r) => setRelationships((prev) => [...prev, r])}
+          onRelationshipChanged={(r) => setRelationships((prev) => prev.map((x) => (x.id === r.id ? r : x)))}
+          onRelationshipDeleted={(id) => setRelationships((prev) => prev.filter((r) => r.id !== id))}
+        />
+      )}
     </div>
   )
 }

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { getPhotoUrl } from '../lib/photos'
+import { useState } from 'react'
+import { photoUrl } from '../lib/photos'
 
 export function Avatar({
   photoPath,
@@ -12,19 +12,8 @@ export function Avatar({
   size?: number
   grayscale?: boolean
 }) {
-  const [url, setUrl] = useState<string | null>(null)
-
-  useEffect(() => {
-    setUrl(null)
-    if (!photoPath) return
-    let live = true
-    getPhotoUrl(photoPath).then((resolved) => {
-      if (live) setUrl(resolved)
-    })
-    return () => {
-      live = false
-    }
-  }, [photoPath])
+  const [failedPath, setFailedPath] = useState<string | null>(null)
+  const url = photoPath && photoPath !== failedPath ? photoUrl(photoPath) : null
 
   const initial = name.trim().charAt(0).toUpperCase() || '?'
   const style = { width: size, height: size, fontSize: size * 0.4 }
@@ -46,7 +35,7 @@ export function Avatar({
       src={url}
       alt={name}
       style={style}
-      onError={() => setUrl(null)}
+      onError={() => setFailedPath(photoPath)}
       className={`shrink-0 rounded-full object-cover ${grayscale ? 'grayscale' : ''}`}
     />
   )

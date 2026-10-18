@@ -1,6 +1,6 @@
 import calcTree from 'relatives-tree'
 import type { Connector, Gender, Node as RTNode, Relation, RelType } from 'relatives-tree/lib/types'
-import type { Person } from './people'
+import { compareSiblings, type Person } from './people'
 import type { Relationship } from './relationships'
 
 // Gender/RelType là `declare const enum` trong .d.ts của lib — import kiểu
@@ -51,30 +51,13 @@ function toLibSpouseType(status: Relationship['status']): 'married' | 'divorced'
   return status === 'divorced' ? 'divorced' : 'married'
 }
 
-// Tuổi suy từ birth_date (chỉ lấy 4 chữ số đầu tiên tìm được — cùng cách làm
-// với dateWarnings ở relationships.ts, dữ liệu gia phả luôn chỉ có năm hoặc
-// gần đúng). Thiếu ngày sinh thì lùi về `sibling_order` — đúng field DB đã có
-// sẵn cho "thứ tự trong gia đình" (requirements.md mục 3), chỗ người dùng tự
-// sắp tay khi không nhớ chính xác ai sinh trước ai.
-function birthYear(p: Pick<Person, 'birth_date'>): number | null {
-  const m = p.birth_date?.match(/\d{4}/)
-  return m ? Number(m[0]) : null
-}
-
-// Con hiển thị trái→phải theo tuổi giảm dần: lớn tuổi (sinh trước, năm nhỏ
-// hơn) đứng bên trái. Dùng để sort mảng `children` trước khi đưa vào
-// relatives-tree — lib xếp node đúng theo thứ tự phần tử trong mảng này (đã
-// xác nhận bằng spike tọa độ), nên sort mảng input là đủ, không cần đụng gì
-// tới thuật toán layout.
-function byAgeDesc(personById: Map<string, Person>) {
+// relatives-tree xếp con trái→phải đúng theo thứ tự mảng `children` truyền vào
+// (đã xác nhận bằng spike tọa độ), nên sort input là đủ.
+function bySiblingOrder(personById: Map<string, Person>) {
   return (aId: string, bId: string): number => {
     const a = personById.get(aId)
     const b = personById.get(bId)
-    if (!a || !b) return 0
-    const ay = birthYear(a)
-    const by = birthYear(b)
-    if (ay !== null && by !== null && ay !== by) return ay - by
-    return a.sibling_order - b.sibling_order
+    return a && b ? compareSiblings(a, b) : 0
   }
 }
 
@@ -148,14 +131,14 @@ function siblingsOf(personId: string, people: Person[], graph: Graph): Relation[
 function buildRTNodes(people: Person[], relationships: Relationship[]): RTNode[] {
   const graph = buildGraph(people, relationships)
   const personById = new Map(people.map((p) => [p.id, p]))
-  const ageDesc = byAgeDesc(personById)
+  const siblingOrder = bySiblingOrder(personById)
   const blood = (id: string): Relation => rel(id, 'blood')
 
   return people.map((p) => ({
     id: p.id,
     gender: toLibGender(p.gender),
     parents: graph.parentsOf.get(p.id)!.map(blood),
-    children: [...graph.childrenOf.get(p.id)!].sort(ageDesc).map(blood),
+    children: [...graph.childrenOf.get(p.id)!].sort(siblingOrder).map(blood),
     siblings: siblingsOf(p.id, people, graph),
     // "vợ 1" đứng gần chồng nhất, các vợ sau xa dần (relatives-tree luôn đặt
     // vợ/chồng "đang kết hôn" cạnh nhau trước, các vợ/chồng khác xếp tiếp theo

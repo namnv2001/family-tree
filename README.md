@@ -1,10 +1,10 @@
 # family-tree
 
-Ứng dụng web hiển thị cây gia phả đơn giản. Một người biên tập nhập dữ liệu thành viên, xem ra sơ đồ cây, chia sẻ link chỉ-xem cho họ hàng.
+Ứng dụng web hiển thị cây gia phả đơn giản. Một người biên tập nhập dữ liệu trên máy, push lên git, họ hàng xem trên GitHub Pages.
 
-**Trạng thái:** M0–M2 xong — đăng nhập Google, CRUD thành viên (thêm/sửa/xóa + undo 10s), ảnh đại diện (crop vuông, Storage), tự lưu, hiển thị cây (pan/zoom, fit toàn cây, về gốc). M3 (quan hệ) đã code xong — mỗi node có nút nhanh +Cha/Mẹ, +Vợ/Chồng, +Con; xóa liên kết không xóa người; cặp ly hôn/đã mất vẽ nét đứt; tối đa 2 cha/mẹ + chặn vòng lặp tổ tiên thực thi bằng trigger Postgres. M4 đã code xong — click node mở panel chi tiết (ảnh, thông tin, cha mẹ/vợ chồng/con click nhảy tới được); thu gọn/mở rộng nhánh (badge số người đang ẩn); "Xem cây từ người này" (pan/zoom camera tới người đó, không ẩn nhánh nào — đổi hướng sau khi phát hiện đổi rootId của thuật toán làm mất cả cô/chú/bác của người được chọn); tìm theo tên không phân biệt dấu. M5 đã code xong — link chia sẻ chỉ-xem (nút "Chia sẻ" ở header, bật/tắt/tạo lại, đọc qua hàm Postgres riêng nên không sửa/xóa được gì dù có link) và xuất ảnh PNG (khung nhìn hiện tại hoặc toàn cây). Chưa click-test bằng trình duyệt thật (xem `docs/plan.md` mục M3–M5) — cần thử tay trước khi dùng thật; phần DB/RLS của M5 đã verify bằng Docker thật.
+**Trạng thái:** CRUD thành viên (undo xóa 10s), ảnh đại diện, tự lưu, quan hệ cha mẹ/vợ chồng/con (tối đa 2 cha/mẹ, chặn vòng lặp tổ tiên), cây pan/zoom, panel chi tiết, thu gọn nhánh, tìm không dấu, xuất PNG. Đã bỏ Supabase: không còn đăng nhập/link chia sẻ — site Pages công khai, chỉ xem; sửa trên máy rồi push.
 
-Vite + React + TS + Tailwind, backend là Supabase (Postgres + Auth + Storage + RLS).
+Vite + React + TS + Tailwind. Dữ liệu là file JSON trong repo, deploy bằng GitHub Pages.
 
 ## Tài liệu
 
@@ -13,72 +13,35 @@ Vite + React + TS + Tailwind, backend là Supabase (Postgres + Auth + Storage + 
 | [docs/requirements.md](docs/requirements.md) | Yêu cầu chức năng MVP (FR), mô hình dữ liệu, ranh giới phạm vi |
 | [docs/plan.md](docs/plan.md) | Kế hoạch triển khai: tech stack, milestone, rủi ro |
 
-## Setup Supabase (làm một lần)
+## Dữ liệu & deploy
 
-### 1. Tạo project
+Không có backend. Toàn bộ cây nằm trong [public/tree.json](public/tree.json), ảnh trong `public/photos/`. Site trên GitHub Pages là bản tĩnh **chỉ xem** — ai có link đều xem được, không cần đăng nhập.
 
-[supabase.com](https://supabase.com) → **New project**. Region **Southeast Asia (Singapore)**. Lưu lại DB password. Chờ ~2 phút.
-
-### 2. Chạy migration
-
-**SQL Editor → New query** → dán toàn bộ nội dung từng file trong [supabase/migrations/](supabase/migrations/) → **Run**, **theo đúng thứ tự số** (0001, 0002, 0003, 0004, …) — file sau có thể phụ thuộc bảng/hàm của file trước.
-
-Kiểm: **Table Editor** thấy 3 bảng `trees`, `people`, `relationships`, cả 3 đều báo *RLS enabled*. **Storage** thấy bucket `photos`, đánh dấu *Private*.
-
-### 3. Lấy callback URL của Supabase
-
-**Authentication → Sign In / Providers → Google** → bật **Enable**. Trang này hiện sẵn:
-
-```
-https://<project-ref>.supabase.co/auth/v1/callback
-```
-
-Copy URL đó, để nguyên tab này.
-
-### 4. Google Cloud Console
-
-[console.cloud.google.com](https://console.cloud.google.com) → tạo project (hoặc dùng project có sẵn).
-
-**APIs & Services → OAuth consent screen**
-- User type: **External**
-- App name, support email, developer email → Save
-- App còn ở chế độ *Testing* → thêm email của mình vào **Test users**, không thì đăng nhập sẽ bị chặn
-
-**APIs & Services → Credentials → Create credentials → OAuth client ID**
-- Application type: **Web application**
-- Authorized JavaScript origins: `http://localhost:5173`
-- Authorized redirect URIs: **dán callback URL ở bước 3**
-- Create → copy **Client ID** và **Client secret**
-
-Về lại tab Supabase, dán Client ID + Secret vào provider Google → **Save**.
-
-### 5. URL Configuration + env
-
-**Authentication → URL Configuration**
-- Site URL: `http://localhost:5173`
-- Redirect URLs: thêm `http://localhost:5173/**`
-
-**Project Settings → API Keys** → copy Project URL và anon/public key (project mới gọi là *publishable key*, `sb_publishable_...` — dùng đúng chỗ đó).
+**Sửa cây** (chỉ chạy được trên máy, không sửa được trên site):
 
 ```bash
-cp .env.example .env.local   # rồi điền 2 giá trị vừa copy
 npm install && npm run dev
 ```
 
-Mở `http://localhost:5173` → Đăng nhập bằng Google → thấy header có email và tên cây. Kiểm **Table Editor → trees**: phải có đúng 1 dòng của user vừa đăng nhập (FR-6.2).
-
-> **Nếu đăng nhập lỗi `Database error saving new user`:** trigger `handle_new_user` chạy trong cùng transaction với việc tạo user, nên trigger fail là signup fail. Xem **Logs → Postgres** để biết lý do; thường là bước 2 chưa chạy hoặc chạy thiếu.
-
-## Kiểm tra migration
-
-Chạy mọi file trong `supabase/migrations/` trên một Postgres tạm trong Docker, kiểm luôn trigger tạo cây tự động (FR-6.2):
+Mở `http://localhost:5173`, sửa như bình thường — mỗi thay đổi tự ghi thẳng vào `public/tree.json` / `public/photos/`. Xong thì đẩy lên:
 
 ```bash
-sh supabase/check.sh
+npm run save
+```
+
+(= `git add` dữ liệu + commit + push.) Push lên `master` → GitHub Actions ([.github/workflows/deploy.yml](.github/workflows/deploy.yml)) build và deploy Pages, ~1 phút sau site cập nhật.
+
+**Bật Pages lần đầu:** repo → Settings → Pages → Source: **GitHub Actions**.
+
+**Chuyển dữ liệu cũ từ Supabase** (một lần): bật chia sẻ trên app cũ để lấy token, rồi
+
+```bash
+node --env-file=.env.local scripts/export-supabase.mjs <share_token>
 ```
 
 ## Quyết định đã chốt
 
 1. **Con nuôi / con riêng** — chỉ ghi trong ghi chú, không thêm field riêng ở MVP.
 2. **Ly hôn / tái hôn** — lưu đủ lịch sử, hiển thị bằng đường nét đứt.
-3. **Một cây / một tài khoản** — không hỗ trợ nhiều cây (ràng buộc bằng unique index `trees_one_per_owner`).
+3. **Một cây** — một file `public/tree.json`, một người biên tập.
+4. **Không realtime** — dữ liệu lên site sau mỗi lần push + deploy.

@@ -7,10 +7,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "save": "git add public/tree.json public/photos && git commit -m \"Update family tree data\" && git push"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.112.2",
     "html-to-image": "^1.11.13",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

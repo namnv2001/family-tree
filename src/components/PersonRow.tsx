@@ -4,6 +4,9 @@ import { formatLifespan, updatePerson } from '../lib/people'
 import { AutosaveSkip, useAutosave, type SaveStatus } from '../lib/useAutosave'
 import { Avatar } from './Avatar'
 import { PhotoField } from './PhotoField'
+import type { RelationshipKind } from './RelationshipModal'
+
+const RELATION_LABEL: Record<RelationshipKind, string> = { parent: 'Cha/Mẹ', spouse: 'Vợ/Chồng', child: 'Con' }
 
 type Draft = Pick<
   Person,
@@ -23,13 +26,15 @@ function toDraft(p: Person): Draft {
 }
 
 export function PersonRow({
-  treeId,
   person,
+  relations,
+  onEditRelations,
   onChanged,
   onDelete,
 }: {
-  treeId: string
   person: Person
+  relations: Record<RelationshipKind, string[]>
+  onEditRelations: (kind: RelationshipKind) => void
   onChanged: (p: Person) => void
   onDelete: () => void
 }) {
@@ -47,27 +52,39 @@ export function PersonRow({
 
   return (
     <div
-      className={`rounded-lg border p-3 ${deceased ? 'border-stone-400 bg-stone-50' : 'border-stone-200'}`}
+      className={`rounded-xl border shadow-sm transition-shadow hover:shadow-md ${deceased ? 'border-stone-400 bg-stone-50' : 'border-stone-200 bg-white'}`}
     >
-      <div className="flex items-center gap-3">
-        <Avatar photoPath={person.photo_path} name={person.full_name} grayscale={deceased} />
-        <div className="flex-1">
-          <p className="font-medium text-stone-800">
-            {person.full_name}
-            {person.alias && <span className="ml-1 text-stone-400">({person.alias})</span>}
-          </p>
-          <p className="text-sm text-stone-500">{formatLifespan(person)}</p>
-        </div>
-        <button onClick={() => setOpen((v) => !v)} className="text-sm text-stone-600 hover:underline">
-          {open ? 'Đóng' : 'Sửa'}
+      <div className="flex items-center gap-2 p-2">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-lg p-1 text-left hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-stone-800"
+        >
+          <Avatar photoPath={person.photo_path} name={person.full_name} grayscale={deceased} />
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-medium text-stone-800">
+              {person.full_name}
+              {person.alias && <span className="ml-1 text-stone-400">({person.alias})</span>}
+            </p>
+            <p className="text-sm text-stone-500">{formatLifespan(person)}</p>
+          </div>
+          <span className="shrink-0 rounded-md px-2 py-1 text-sm text-stone-600">
+            {open ? 'Đóng ▴' : 'Sửa ▾'}
+          </span>
         </button>
-        <button onClick={onDelete} className="text-sm text-red-600 hover:underline">
+        <button
+          type="button"
+          onClick={onDelete}
+          aria-label={`Xóa ${person.full_name}`}
+          className="shrink-0 rounded-md px-2 py-1 text-sm text-red-600 hover:bg-red-50"
+        >
           Xóa
         </button>
       </div>
 
       {open && (
-        <div className="mt-3 grid gap-3 border-t border-stone-200 pt-3 sm:grid-cols-2">
+        <div className="grid gap-3 border-t border-stone-200 p-3 sm:grid-cols-2">
           <TextField
             label="Họ tên *"
             value={draft.full_name}
@@ -121,8 +138,28 @@ export function PersonRow({
             />
           </label>
 
+          <div className="flex flex-col gap-1 text-sm text-stone-600 sm:col-span-2">
+            Quan hệ
+            <div className="flex flex-col divide-y divide-stone-200 rounded-md border border-stone-300">
+              {(Object.keys(RELATION_LABEL) as RelationshipKind[]).map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  onClick={() => onEditRelations(kind)}
+                  className="flex items-center gap-2 px-3 py-2 text-left hover:bg-stone-50"
+                >
+                  <span className="w-20 shrink-0 text-stone-500">{RELATION_LABEL[kind]}</span>
+                  <span className={`min-w-0 flex-1 truncate ${relations[kind].length ? 'text-stone-800' : 'text-stone-400'}`}>
+                    {relations[kind].join(', ') || 'Chưa có'}
+                  </span>
+                  <span className="shrink-0 text-stone-500">{relations[kind].length ? 'Sửa' : '+ Thêm'}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="sm:col-span-2">
-            <PhotoField treeId={treeId} person={person} onChanged={onChanged} />
+            <PhotoField person={person} onChanged={onChanged} />
           </div>
 
           <div className="sm:col-span-2">

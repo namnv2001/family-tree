@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import type { Gender, Person } from '../lib/people'
-import { createPerson } from '../lib/people'
+import { createPerson, setSiblingOrder } from '../lib/people'
 import { useDialogA11y } from '../lib/useDialogA11y'
+import { PersonCombobox } from './PersonCombobox'
 import {
   ancestorsOf,
   childrenOf,
@@ -15,6 +16,7 @@ import {
   type RelatedPerson,
   type Relationship,
   type SpouseStatus,
+  STATUS_LABEL,
 } from '../lib/relationships'
 
 export type RelationshipKind = 'parent' | 'spouse' | 'child'
@@ -25,31 +27,25 @@ const KIND_LABEL: Record<RelationshipKind, string> = {
   child: 'Con',
 }
 
-const STATUS_LABEL: Record<SpouseStatus, string> = {
-  married: 'Đang kết hôn',
-  divorced: 'Đã ly hôn',
-  widowed: 'Đã mất',
-}
-
 export function RelationshipModal({
-  treeId,
   person,
   kind,
   people,
   relationships,
   onClose,
   onPersonCreated,
+  onPeopleUpdated,
   onRelationshipCreated,
   onRelationshipChanged,
   onRelationshipDeleted,
 }: {
-  treeId: string
   person: Person
   kind: RelationshipKind
   people: Person[]
   relationships: Relationship[]
   onClose: () => void
   onPersonCreated: (p: Person) => void
+  onPeopleUpdated: (updated: Person[]) => void
   onRelationshipCreated: (r: Relationship) => void
   onRelationshipChanged: (r: Relationship) => void
   onRelationshipDeleted: (id: string) => void
@@ -78,6 +74,21 @@ export function RelationshipModal({
     }
   }
 
+  async function moveChild(index: number, delta: -1 | 1) {
+    const ordered = existing.map(({ person: p }) => p)
+    const [moved] = ordered.splice(index, 1)
+    ordered.splice(index + delta, 0, moved!)
+    setDeleteError(null)
+    try {
+      await setSiblingOrder(ordered.map((p) => p.id))
+      onPeopleUpdated(ordered.map((p, i) => ({ ...p, sibling_order: i + 1 })))
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Đổi thứ tự thất bại.')
+    }
+  }
+
+  const canReorder = kind === 'child' && existing.length > 1
+
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={onClose}>
       <div
@@ -98,14 +109,40 @@ export function RelationshipModal({
           </button>
         </div>
 
+        {canReorder && (
+          <p className="mb-2 text-xs text-stone-500">Xếp từ con cả đến con út — dùng khi không đủ năm sinh.</p>
+        )}
         {existing.length > 0 && (
           <ul className="mb-4 flex flex-col gap-1.5">
-            {existing.map(({ rel, person: other }) => (
+            {existing.map(({ rel, person: other }, i) => (
               <li
                 key={rel.id}
                 className="flex items-center justify-between rounded-md border border-stone-200 px-2.5 py-1.5 text-sm"
               >
                 <span className="flex items-center gap-1.5">
+                  {canReorder && (
+                    <span className="flex">
+                      <button
+                        type="button"
+                        onClick={() => moveChild(i, -1)}
+                        disabled={i === 0}
+                        aria-label={`Đưa ${other.full_name} lên trên`}
+                        className="rounded px-1.5 text-stone-500 hover:bg-stone-100 disabled:opacity-30"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveChild(i, 1)}
+                        disabled={i === existing.length - 1}
+                        aria-label={`Đưa ${other.full_name} xuống dưới`}
+                        className="rounded px-1.5 text-stone-500 hover:bg-stone-100 disabled:opacity-30"
+                      >
+                        ↓
+                      </button>
+                    </span>
+                  )}
+                  {canReorder && <span className="w-4 text-xs text-stone-400">{i + 1}.</span>}
                   {other.full_name}
                   {rel.type === 'spouse_of' && rel.status && (
                     <SpouseStatusSelect rel={rel} onChanged={onRelationshipChanged} />
@@ -127,7 +164,6 @@ export function RelationshipModal({
           <p className="text-sm text-stone-500">Đã đủ 2 cha/mẹ — xóa bớt một liên kết ở trên nếu muốn thay.</p>
         ) : (
           <AddForm
-            treeId={treeId}
             person={person}
             kind={kind}
             people={people}
@@ -184,7 +220,6 @@ function SpouseStatusSelect({
 }
 
 function AddForm({
-  treeId,
   person,
   kind,
   people,
@@ -192,7 +227,6 @@ function AddForm({
   onPersonCreated,
   onRelationshipCreated,
 }: {
-  treeId: string
   person: Person
   kind: RelationshipKind
   people: Person[]
@@ -218,7 +252,7 @@ function AddForm({
   for (const { person: p } of kind === 'parent' ? parentsOf(person.id, people, relationships) : []) excluded.add(p.id)
   for (const { person: p } of kind === 'child' ? childrenOf(person.id, people, relationships) : []) excluded.add(p.id)
   for (const { person: p } of kind === 'spouse' ? spousesOf(person.id, people, relationships) : []) excluded.add(p.id)
-  // Không cho chọn người sẽ tạo vòng lặp (chắc chắn bị trigger DB chặn — lọc trước cho gọn).
+  // Không cho chọn người sẽ tạo vòng lặp (chắc chắn bị assertValidRelationship chặn — lọc trước cho gọn).
   if (kind === 'parent') for (const id of descendantsOf(person.id, relationships)) excluded.add(id)
   if (kind === 'child') for (const id of ancestorsOf(person.id, relationships)) excluded.add(id)
 
@@ -245,7 +279,7 @@ function AddForm({
           setError('Cần nhập họ tên.')
           return
         }
-        const created = await createPerson(treeId, { full_name: name, gender: newGender })
+        const created = await createPerson({ full_name: name, gender: newGender })
         onPersonCreated(created)
         otherId = created.id
       } else if (!otherId) {
@@ -254,10 +288,10 @@ function AddForm({
       }
 
       if (kind === 'parent') {
-        const r = await createRelationship(treeId, { type: 'parent_of', from_id: otherId, to_id: person.id })
+        const r = await createRelationship({ type: 'parent_of', from_id: otherId, to_id: person.id })
         onRelationshipCreated(r)
       } else if (kind === 'spouse') {
-        const r = await createRelationship(treeId, {
+        const r = await createRelationship({
           type: 'spouse_of',
           from_id: person.id,
           to_id: otherId,
@@ -265,10 +299,10 @@ function AddForm({
         })
         onRelationshipCreated(r)
       } else {
-        const r = await createRelationship(treeId, { type: 'parent_of', from_id: person.id, to_id: otherId })
+        const r = await createRelationship({ type: 'parent_of', from_id: person.id, to_id: otherId })
         onRelationshipCreated(r)
         if (coParentId) {
-          const r2 = await createRelationship(treeId, { type: 'parent_of', from_id: coParentId, to_id: otherId })
+          const r2 = await createRelationship({ type: 'parent_of', from_id: coParentId, to_id: otherId })
           onRelationshipCreated(r2)
         }
       }
@@ -301,18 +335,14 @@ function AddForm({
         candidates.length === 0 ? (
           <p className="text-sm text-stone-400">Không có người phù hợp trong cây — hãy tạo người mới.</p>
         ) : (
-          <select
-            value={existingId}
-            onChange={(e) => setExistingId(e.target.value)}
-            className="rounded-md border border-stone-300 px-2 py-1.5 text-sm"
-          >
-            <option value="">— Chọn người —</option>
-            {candidates.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.full_name}
-              </option>
-            ))}
-          </select>
+          <PersonCombobox
+            people={candidates}
+            selectedId={existingId}
+            onSelect={(p) => setExistingId(p?.id ?? '')}
+            placeholder="Gõ tên để chọn người…"
+            label="Chọn người"
+            className="w-full"
+          />
         )
       ) : (
         <div className="flex gap-2">
