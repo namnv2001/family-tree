@@ -1,55 +1,68 @@
 import type { Person } from './people'
-import { supabase } from './supabase'
+import { loadTree, mutate } from './store'
 
 export type RelationshipType = 'parent_of' | 'spouse_of'
 export type SpouseStatus = 'married' | 'divorced' | 'widowed'
 
 export type Relationship = {
   id: string
-  tree_id: string
   type: RelationshipType
   from_id: string
   to_id: string
   status: SpouseStatus | null
 }
 
-export async function listRelationships(treeId: string): Promise<Relationship[]> {
-  const { data, error } = await supabase
-    .from('relationships')
-    .select('*')
-    .eq('tree_id', treeId)
-  if (error) throw error
-  return data as Relationship[]
+export async function listRelationships(): Promise<Relationship[]> {
+  return [...(await loadTree()).relationships]
 }
 
-// FR-2.1: tạo quan hệ từ node. from_id/to_id theo đúng chiều schema
+// FR-2.1: tạo quan hệ từ node. from_id/to_id theo đúng chiều
 // (parent_of: from = cha/mẹ, to = con; spouse_of: không hướng, thứ tự không quan trọng).
-export async function createRelationship(
-  treeId: string,
-  input: { type: RelationshipType; from_id: string; to_id: string; status?: SpouseStatus | null },
-): Promise<Relationship> {
-  const { data, error } = await supabase
-    .from('relationships')
-    .insert({ tree_id: treeId, status: null, ...input })
-    .select('*')
-    .single()
-  if (error) throw error
-  return data as Relationship
+export async function createRelationship(input: {
+  type: RelationshipType
+  from_id: string
+  to_id: string
+  status?: SpouseStatus | null
+}): Promise<Relationship> {
+  const { relationships } = await loadTree()
+  assertValidRelationship(input, relationships)
+  const rel: Relationship = { id: crypto.randomUUID(), status: null, ...input }
+  await mutate((d) => d.relationships.push(rel))
+  return rel
+}
+
+// FR-2.2: các ràng buộc trước đây do constraint/trigger Postgres giữ.
+export function assertValidRelationship(
+  input: Pick<Relationship, 'type' | 'from_id' | 'to_id'>,
+  relationships: Relationship[],
+): void {
+  const { type, from_id, to_id } = input
+  if (from_id === to_id) throw new Error('Không thể tạo quan hệ với chính mình.')
+  const sameType = relationships.filter((r) => r.type === type)
+  if (type === 'spouse_of') {
+    if (sameType.some((r) => (r.from_id === from_id && r.to_id === to_id) || (r.from_id === to_id && r.to_id === from_id)))
+      throw new Error('Hai người này đã là vợ/chồng.')
+    return
+  }
+  if (sameType.some((r) => r.from_id === from_id && r.to_id === to_id)) throw new Error('Quan hệ này đã có.')
+  if (sameType.filter((r) => r.to_id === to_id).length >= 2) throw new Error('Người này đã có đủ 2 cha/mẹ.')
+  if (ancestorsOf(from_id, relationships).has(to_id))
+    throw new Error('Không thể tạo quan hệ này: sẽ tạo vòng lặp tổ tiên.')
 }
 
 // FR-2.4: xóa liên kết, không đụng tới người.
 export async function deleteRelationship(id: string): Promise<void> {
-  const { error } = await supabase.from('relationships').delete().eq('id', id)
-  if (error) throw error
+  await mutate((d) => {
+    d.relationships = d.relationships.filter((r) => r.id !== id)
+  })
 }
 
 // Sửa status của một liên kết spouse_of đã có (vd: "Đang kết hôn" -> "Đã mất"
-// khi người kia qua đời). Đây là UPDATE tại chỗ, không phải tạo liên kết mới —
-// khác với ca ly hôn-rồi-tái hôn CÙNG một người (đó mới cần 2 row riêng để giữ
-// đủ lịch sử theo FR-2.3).
+// khi người kia qua đời) — sửa tại chỗ, không tạo liên kết mới.
 export async function updateRelationshipStatus(id: string, status: SpouseStatus): Promise<void> {
-  const { error } = await supabase.from('relationships').update({ status }).eq('id', id)
-  if (error) throw error
+  await mutate((d) => {
+    d.relationships = d.relationships.map((r) => (r.id === id ? { ...r, status } : r))
+  })
 }
 
 export type RelatedPerson = { rel: Relationship; person: Person }
@@ -85,7 +98,7 @@ export function childrenOf(personId: string, people: Person[], relationships: Re
 
 // BFS ngược theo parent_of để lấy mọi tổ tiên (cha/mẹ, ông/bà, ...) của personId.
 // Dùng để lọc danh sách chọn "con đã có sẵn": không cho chọn tổ tiên của chính
-// mình làm con — chắc chắn bị trigger DB chặn (vòng lặp), lọc trước cho đỡ báo lỗi vô ích.
+// mình làm con — chắc chắn bị assertValidRelationship chặn (vòng lặp), lọc trước cho đỡ báo lỗi vô ích.
 export function ancestorsOf(personId: string, relationships: Relationship[]): Set<string> {
   const out = new Set<string>()
   let frontier = [personId]

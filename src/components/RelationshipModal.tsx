@@ -32,7 +32,6 @@ const STATUS_LABEL: Record<SpouseStatus, string> = {
 }
 
 export function RelationshipModal({
-  treeId,
   person,
   kind,
   people,
@@ -43,7 +42,6 @@ export function RelationshipModal({
   onRelationshipChanged,
   onRelationshipDeleted,
 }: {
-  treeId: string
   person: Person
   kind: RelationshipKind
   people: Person[]
@@ -127,7 +125,6 @@ export function RelationshipModal({
           <p className="text-sm text-stone-500">Đã đủ 2 cha/mẹ — xóa bớt một liên kết ở trên nếu muốn thay.</p>
         ) : (
           <AddForm
-            treeId={treeId}
             person={person}
             kind={kind}
             people={people}
@@ -184,7 +181,6 @@ function SpouseStatusSelect({
 }
 
 function AddForm({
-  treeId,
   person,
   kind,
   people,
@@ -192,7 +188,6 @@ function AddForm({
   onPersonCreated,
   onRelationshipCreated,
 }: {
-  treeId: string
   person: Person
   kind: RelationshipKind
   people: Person[]
@@ -218,7 +213,7 @@ function AddForm({
   for (const { person: p } of kind === 'parent' ? parentsOf(person.id, people, relationships) : []) excluded.add(p.id)
   for (const { person: p } of kind === 'child' ? childrenOf(person.id, people, relationships) : []) excluded.add(p.id)
   for (const { person: p } of kind === 'spouse' ? spousesOf(person.id, people, relationships) : []) excluded.add(p.id)
-  // Không cho chọn người sẽ tạo vòng lặp (chắc chắn bị trigger DB chặn — lọc trước cho gọn).
+  // Không cho chọn người sẽ tạo vòng lặp (chắc chắn bị assertValidRelationship chặn — lọc trước cho gọn).
   if (kind === 'parent') for (const id of descendantsOf(person.id, relationships)) excluded.add(id)
   if (kind === 'child') for (const id of ancestorsOf(person.id, relationships)) excluded.add(id)
 
@@ -245,7 +240,7 @@ function AddForm({
           setError('Cần nhập họ tên.')
           return
         }
-        const created = await createPerson(treeId, { full_name: name, gender: newGender })
+        const created = await createPerson({ full_name: name, gender: newGender })
         onPersonCreated(created)
         otherId = created.id
       } else if (!otherId) {
@@ -254,10 +249,10 @@ function AddForm({
       }
 
       if (kind === 'parent') {
-        const r = await createRelationship(treeId, { type: 'parent_of', from_id: otherId, to_id: person.id })
+        const r = await createRelationship({ type: 'parent_of', from_id: otherId, to_id: person.id })
         onRelationshipCreated(r)
       } else if (kind === 'spouse') {
-        const r = await createRelationship(treeId, {
+        const r = await createRelationship({
           type: 'spouse_of',
           from_id: person.id,
           to_id: otherId,
@@ -265,10 +260,10 @@ function AddForm({
         })
         onRelationshipCreated(r)
       } else {
-        const r = await createRelationship(treeId, { type: 'parent_of', from_id: person.id, to_id: otherId })
+        const r = await createRelationship({ type: 'parent_of', from_id: person.id, to_id: otherId })
         onRelationshipCreated(r)
         if (coParentId) {
-          const r2 = await createRelationship(treeId, { type: 'parent_of', from_id: coParentId, to_id: otherId })
+          const r2 = await createRelationship({ type: 'parent_of', from_id: coParentId, to_id: otherId })
           onRelationshipCreated(r2)
         }
       }

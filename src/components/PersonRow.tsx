@@ -23,12 +23,10 @@ function toDraft(p: Person): Draft {
 }
 
 export function PersonRow({
-  treeId,
   person,
   onChanged,
   onDelete,
 }: {
-  treeId: string
   person: Person
   onChanged: (p: Person) => void
   onDelete: () => void
@@ -122,7 +120,7 @@ export function PersonRow({
           </label>
 
           <div className="sm:col-span-2">
-            <PhotoField treeId={treeId} person={person} onChanged={onChanged} />
+            <PhotoField person={person} onChanged={onChanged} />
           </div>
 
           <div className="sm:col-span-2">

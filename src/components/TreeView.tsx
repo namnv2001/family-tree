@@ -7,6 +7,7 @@ import {
 } from 'react-zoom-pan-pinch'
 import { listPeople, type Person } from '../lib/people'
 import { collapsedBranchIds, descendantsOf, listRelationships, type Relationship } from '../lib/relationships'
+import { editable } from '../lib/store'
 import { buildTreeLayout } from '../lib/treeLayout'
 import { PersonPanel } from './PersonPanel'
 import { RelationshipModal, type RelationshipKind } from './RelationshipModal'
@@ -18,25 +19,10 @@ import { TreeSearch } from './TreeSearch'
 const UNIT_X = NODE_WIDTH / 2
 const UNIT_Y = NODE_HEIGHT / 2
 
-export function TreeView({
-  treeId,
-  readOnlyData,
-}: {
-  // Cây của chính chủ (đăng nhập, sửa được) — TreeView tự tải qua listPeople/
-  // listRelationships. Bỏ qua khi xem qua link chia sẻ.
-  treeId?: string
-  // FR-5.1: xem qua link chia sẻ — dữ liệu đã tải sẵn (qua get_shared_tree,
-  // xem lib/share.ts) từ trước khi TreeView mount, không tự fetch gì thêm
-  // (không có treeId để fetch, và cũng không có quyền — RLS chỉ mở đường đọc
-  // qua đúng RPC đó). Có mặt prop này = chế độ chỉ-xem: ẩn 3 nút nhanh thêm
-  // quan hệ (AC "không thấy nút sửa/xóa nào"), không mở RelationshipModal.
-  readOnlyData?: { people: Person[]; relationships: Relationship[] }
-}) {
-  const readOnly = !treeId
-  const [people, setPeople] = useState<Person[] | null>(readOnlyData?.people ?? null)
-  const [relationships, setRelationships] = useState<Relationship[] | null>(
-    readOnlyData?.relationships ?? null,
-  )
+export function TreeView() {
+  const readOnly = !editable
+  const [people, setPeople] = useState<Person[] | null>(null)
+  const [relationships, setRelationships] = useState<Relationship[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [modal, setModal] = useState<{ person: Person; kind: RelationshipKind } | null>(null)
   // FR-3.5: người đang mở panel chi tiết — giữ ID, không giữ bản Person sao
@@ -56,8 +42,7 @@ export function TreeView({
   const transformRef = useRef<ReactZoomPanPinchContentRef>(null)
 
   useEffect(() => {
-    if (!treeId) return // chế độ chia sẻ: dữ liệu đã có sẵn qua readOnlyData, không fetch.
-    Promise.all([listPeople(treeId), listRelationships(treeId)])
+    Promise.all([listPeople(), listRelationships()])
       .then(([p, r]) => {
         setPeople(p)
         setRelationships(r)
@@ -65,7 +50,7 @@ export function TreeView({
       .catch((err) =>
         setError(err instanceof Error ? err.message : 'Không tải được cây.'),
       )
-  }, [treeId])
+  }, [])
 
   // FR-3.3: nhánh thu gọn → loại hẳn người bị ẩn khỏi ĐẦU VÀO trước khi tính
   // layout, để buildTreeLayout không cần biết gì về "thu gọn" — tái dùng đúng
@@ -216,11 +201,7 @@ export function TreeView({
       a.download = kind === 'viewport' ? 'cay-gia-pha-khung-nhin.png' : 'cay-gia-pha-toan-canh.png'
       a.click()
     } catch {
-      // Nguyên nhân phổ biến nhất: ảnh đại diện tải từ domain khác (Supabase
-      // Storage) không có header CORS cho phép đọc pixel — html-to-image
-      // không nhúng được ảnh đó vào SVG trung gian. Chưa có browser tool để
-      // xác nhận thật trên project thật (xem docs/plan.md mục M5).
-      setExportError('Xuất ảnh thất bại — có thể do ảnh đại diện tải từ nguồn ngoài.')
+      setExportError('Xuất ảnh thất bại.')
     } finally {
       setExporting(false)
     }
@@ -383,9 +364,8 @@ export function TreeView({
         </div>
       )}
 
-      {modal && people && relationships && treeId && (
+      {modal && people && relationships && editable && (
         <RelationshipModal
-          treeId={treeId}
           person={modal.person}
           kind={modal.kind}
           people={people}

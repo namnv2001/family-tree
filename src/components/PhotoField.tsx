@@ -7,11 +7,9 @@ import { Avatar } from './Avatar'
 // Upload là hành động rời rạc (không phải gõ liên tục) nên lưu ngay, không qua
 // debounce của useAutosave — khác với các field text ở PersonRow.
 export function PhotoField({
-  treeId,
   person,
   onChanged,
 }: {
-  treeId: string
   person: Person
   onChanged: (p: Person) => void
 }) {
@@ -23,8 +21,9 @@ export function PhotoField({
     setBusy(true)
     setError(null)
     try {
-      const path = await uploadPersonPhoto(treeId, person.id, file)
+      const path = await uploadPersonPhoto(person.id, file)
       await updatePerson(person.id, { photo_path: path })
+      if (person.photo_path) await deletePersonPhoto(person.photo_path)
       onChanged({ ...person, photo_path: path })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Tải ảnh thất bại.')

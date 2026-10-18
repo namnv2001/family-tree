@@ -8,7 +8,7 @@ const UNDO_MS = 10_000 // FR-1.2: undo trong 10 giây
 
 type PendingDelete = { person: Person; timer: ReturnType<typeof setTimeout> }
 
-export function PeoplePage({ treeId }: { treeId: string }) {
+export function PeoplePage() {
   const [people, setPeople] = useState<Person[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -18,10 +18,10 @@ export function PeoplePage({ treeId }: { treeId: string }) {
   const [pendingIds, setPendingIds] = useState<string[]>([])
 
   useEffect(() => {
-    listPeople(treeId)
+    listPeople()
       .then(setPeople)
       .catch((err) => setError(err instanceof Error ? err.message : 'Không tải được danh sách.'))
-  }, [treeId])
+  }, [])
 
   useEffect(() => {
     // Rời trang giữa lúc đang chờ undo: hủy hẹn giờ, đừng xóa "ma" sau khi unmount.
@@ -38,7 +38,7 @@ export function PeoplePage({ treeId }: { treeId: string }) {
   const visible = people.filter((p) => !pending.current.has(p.id))
 
   async function handleAdd(input: NewPerson) {
-    const created = await createPerson(treeId, input)
+    const created = await createPerson(input)
     setPeople((prev) => [...(prev ?? []), created]) // FR-1.1: node xuất hiện ngay, không reload
   }
 
@@ -99,7 +99,6 @@ export function PeoplePage({ treeId }: { treeId: string }) {
         {visible.map((p) => (
           <li key={p.id}>
             <PersonRow
-              treeId={treeId}
               person={p}
               onChanged={handleChanged}
               onDelete={() => handleDeleteClick(p)}
